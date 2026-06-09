@@ -83,6 +83,7 @@ function getValue(food, possibleNames) {
       return food[name];
     }
   }
+
   return 0;
 }
 
@@ -105,6 +106,91 @@ function calculateNutritionForAmount(food, amountG) {
     carbs: round(per100g.carbs * factor, 1),
     fat: round(per100g.fat * factor, 1)
   };
+}
+
+/* -------------------------------------------------------
+   Suche verbessern: deutsche Begriffe + Wildcard-Suche
+------------------------------------------------------- */
+
+function normalizeSearchQuery(query) {
+  const replacements = {
+    joghurt: "yogurt",
+    yoghurt: "yogurt",
+    yogurt: "yogurt",
+
+    banane: "banana",
+    bananen: "banana",
+
+    apfel: "apple",
+    aepfel: "apple",
+    äpfel: "apple",
+
+    milch: "milk",
+    kaffee: "coffee",
+
+    käse: "cheese",
+    kaese: "cheese",
+
+    huhn: "chicken",
+    hähnchen: "chicken",
+    haehnchen: "chicken",
+    poulet: "chicken",
+
+    rind: "beef",
+    rindfleisch: "beef",
+
+    schwein: "pork",
+    schweinefleisch: "pork",
+
+    reis: "rice",
+    nudeln: "pasta",
+    pasta: "pasta",
+
+    kartoffel: "potato",
+    kartoffeln: "potato",
+
+    ei: "egg",
+    eier: "egg",
+
+    brot: "bread",
+    toast: "bread",
+
+    hafer: "oat",
+    haferflocken: "oat",
+
+    quark: "curd",
+    skyr: "yogurt",
+
+    lachs: "salmon",
+    thunfisch: "tuna",
+
+    tomate: "tomato",
+    tomaten: "tomato",
+
+    gurke: "cucumber",
+    gurken: "cucumber",
+
+    salat: "lettuce"
+  };
+
+  return query
+    .toLowerCase()
+    .trim()
+    .replaceAll("ä", "ae")
+    .replaceAll("ö", "oe")
+    .replaceAll("ü", "ue")
+    .replaceAll("ß", "ss")
+    .replace(/[.,;:!?()[\]{}]/g, " ")
+    .split(/\s+/)
+    .map(word => replacements[word] || word)
+    .join(" ");
+}
+
+function getSearchTerms(query) {
+  return normalizeSearchQuery(query)
+    .split(/\s+/)
+    .map(term => term.trim())
+    .filter(term => term.length >= 2);
 }
 
 async function loadFavorites() {
@@ -226,45 +312,7 @@ async function deleteSelectedFavorite() {
   favoriteSelect.value = "";
   await loadFavorites();
 }
-function normalizeSearchQuery(query) {
-  const replacements = {
-    joghurt: "yogurt",
-    yoghurt: "yogurt",
-    banane: "banana",
-    apfel: "apple",
-    milch: "milk",
-    käse: "cheese",
-    kaese: "cheese",
-    huhn: "chicken",
-    hähnchen: "chicken",
-    haehnchen: "chicken",
-    reis: "rice",
-    nudeln: "pasta",
-    kartoffel: "potato",
-    ei: "egg",
-    eier: "egg",
-    brot: "bread",
-    haferflocken: "oat"
-  };
 
-  return query
-    .toLowerCase()
-    .trim()
-    .replaceAll("ä", "ae")
-    .replaceAll("ö", "oe")
-    .replaceAll("ü", "ue")
-    .replaceAll("ß", "ss")
-    .split(/\s+/)
-    .map(word => replacements[word] || word)
-    .join(" ");
-}
-
-function getSearchTerms(query) {
-  return normalizeSearchQuery(query)
-    .split(/\s+/)
-    .map(term => term.trim())
-    .filter(term => term.length >= 2);
-}
 async function searchFoods() {
   const query = foodSearchInput.value.trim();
 
@@ -275,19 +323,58 @@ async function searchFoods() {
 
   foodResults.innerHTML = "<p>Suche läuft...</p>";
 
-  const { data, error } = await supabaseClient
-    .from(FOOD_TABLE)
-    .select("*")
-    .ilike("Shrt_Desc", `%${query}%`)
-    .limit(20);
+  const searchTerms = getSearchTerms(query);
 
-  if (error) {
-    console.error("Fehler bei der Suche:", error);
-    foodResults.innerHTML = "<p>Suche hat nicht geklappt. Prüfe Tabellenname und Spaltennamen.</p>";
+  if (searchTerms.length === 0) {
+    foodResults.innerHTML = "<p>Bitte mindestens 2 Zeichen eingeben.</p>";
     return;
   }
 
-  renderFoodResults(data);
+  let request = supabaseClient
+    .from(FOOD_TABLE)
+    .select("*")
+    .limit(40);
+
+  searchTerms.forEach(term => {
+    request = request.ilike("Shrt_Desc", `%${term}%`);
+  });
+
+  const { data, error } = await request;
+
+  if (error) {
+    console.error("Fehler bei der Wildcard-Suche:", error);
+    foodResults.innerHTML = "<p>Suche hat nicht geklappt.</p>";
+    return;
+  }
+
+  renderFoodResults(sortFoodResults(data, searchTerms));
+}
+
+function sortFoodResults(foods, searchTerms) {
+  if (!foods) return [];
+
+  return foods.sort((a, b) => {
+    const nameA = String(a.Shrt_Desc || "").toLowerCase();
+    const nameB = String(b.Shrt_Desc || "").toLowerCase();
+
+    const scoreA = getSearchScore(nameA, searchTerms);
+    const scoreB = getSearchScore(nameB, searchTerms);
+
+    return scoreB - scoreA;
+  });
+}
+
+function getSearchScore(foodName, searchTerms) {
+  let score = 0;
+
+  searchTerms.forEach(term => {
+    if (foodName.startsWith(term)) score += 10;
+    if (foodName.includes(term)) score += 5;
+    if (foodName.includes(`,${term}`)) score += 3;
+    if (foodName.includes(` ${term}`)) score += 3;
+  });
+
+  return score;
 }
 
 function renderFoodResults(foods) {
@@ -664,11 +751,13 @@ async function saveProfile() {
 
 function formatDate(dateString) {
   if (!dateString) return "";
+
   return new Date(dateString).toLocaleDateString("de-DE");
 }
 
 function formatTime(dateString) {
   if (!dateString) return "";
+
   return new Date(dateString).toLocaleTimeString("de-DE", {
     hour: "2-digit",
     minute: "2-digit"
