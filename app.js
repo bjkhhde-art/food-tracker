@@ -3,7 +3,17 @@ const SUPABASE_KEY = "sb_publishable_uunR3UQ9rttiK8dG85IedQ__Tn1duVK";
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const FOOD_TABLE = "usda_foods";
+const FOOD_TABLE = "bls_foods";
+
+const BLS_COLUMNS = {
+  id: "BLS Code",
+  nameDe: "Lebensmittelbezeichnung",
+  nameEn: "Food name",
+  calories: "ENERCC Energie (Kilokalorien) [kcal/100g]",
+  protein: "PROT625 Protein (Nx6,25) [g/100g]",
+  carbs: "CHO Kohlenhydrate, verfügbar [g/100g]",
+  fat: "FAT Fett [g/100g]"
+};
 
 const foodSearchInput = document.getElementById("foodSearchInput");
 const searchFoodBtn = document.getElementById("searchFoodBtn");
@@ -70,7 +80,19 @@ function toDateInput(date) {
 
 function toNumber(value) {
   if (value === null || value === undefined || value === "") return 0;
-  return Number(String(value).replace(",", ".")) || 0;
+
+  const text = String(value).trim();
+
+  if (
+    text === "-" ||
+    text.toUpperCase() === "TR" ||
+    text.toUpperCase() === "NA" ||
+    text.startsWith("<")
+  ) {
+    return 0;
+  }
+
+  return Number(text.replace(",", ".")) || 0;
 }
 
 function round(value, decimals = 1) {
@@ -87,12 +109,66 @@ function getValue(food, possibleNames) {
   return 0;
 }
 
+function getFoodId(food) {
+  return String(
+    getValue(food, [
+      BLS_COLUMNS.id,
+      "bls_code",
+      "BLS_Code",
+      "id"
+    ])
+  ).trim();
+}
+
+function getFoodName(food) {
+  return String(
+    getValue(food, [
+      BLS_COLUMNS.nameDe,
+      "lebensmittelbezeichnung",
+      "Lebensmittel",
+      "food_name_de",
+      BLS_COLUMNS.nameEn,
+      "food_name",
+      "Food_Name"
+    ])
+  ).trim() || "Unbekanntes Lebensmittel";
+}
+
 function getFoodNutritionPer100g(food) {
   return {
-    calories: toNumber(getValue(food, ["Energ_Kcal", "Energy_Kcal", "Calories", "calories"])),
-    protein: toNumber(getValue(food, ["Protein_(g)", "Protein_g", "Protein", "protein_g"])),
-    carbs: toNumber(getValue(food, ["Carbohydrt_(g)", "Carbohydrate_(g)", "Carbs_(g)", "Carbs", "carbs_g"])),
-    fat: toNumber(getValue(food, ["Lipid_Tot_(g)", "Fat_(g)", "Fat_g", "Fat", "fat_g"]))
+    calories: toNumber(
+      getValue(food, [
+        BLS_COLUMNS.calories,
+        "ENERCC",
+        "energy_kcal",
+        "calories",
+        "Calories"
+      ])
+    ),
+    protein: toNumber(
+      getValue(food, [
+        BLS_COLUMNS.protein,
+        "PROT625",
+        "protein_g",
+        "Protein"
+      ])
+    ),
+    carbs: toNumber(
+      getValue(food, [
+        BLS_COLUMNS.carbs,
+        "CHO",
+        "carbs_g",
+        "Carbs"
+      ])
+    ),
+    fat: toNumber(
+      getValue(food, [
+        BLS_COLUMNS.fat,
+        "FAT",
+        "fat_g",
+        "Fat"
+      ])
+    )
   };
 }
 
@@ -108,78 +184,63 @@ function calculateNutritionForAmount(food, amountG) {
   };
 }
 
-/* -------------------------------------------------------
-   Suche verbessern: deutsche Begriffe + Wildcard-Suche
-------------------------------------------------------- */
-
 function normalizeSearchQuery(query) {
   const replacements = {
-    joghurt: "yogurt",
-    yoghurt: "yogurt",
-    yogurt: "yogurt",
+    yoghurt: "joghurt",
+    yogurt: "joghurt",
 
-    banane: "banana",
-    bananen: "banana",
+    bananen: "banane",
+    banana: "banane",
 
-    apfel: "apple",
-    aepfel: "apple",
-    äpfel: "apple",
+    aepfel: "apfel",
+    äpfel: "apfel",
+    apple: "apfel",
 
-    milch: "milk",
-    kaffee: "coffee",
+    haehnchen: "hähnchen",
+    huhn: "hähnchen",
+    chicken: "hähnchen",
 
-    käse: "cheese",
-    kaese: "cheese",
+    kaese: "käse",
+    cheese: "käse",
 
-    huhn: "chicken",
-    hähnchen: "chicken",
-    haehnchen: "chicken",
-    poulet: "chicken",
+    beef: "rind",
+    rindfleisch: "rind",
 
-    rind: "beef",
-    rindfleisch: "beef",
+    pork: "schwein",
+    schweinefleisch: "schwein",
 
-    schwein: "pork",
-    schweinefleisch: "pork",
+    rice: "reis",
+    pasta: "nudeln",
+    noodles: "nudeln",
 
-    reis: "rice",
-    nudeln: "pasta",
-    pasta: "pasta",
+    kartoffeln: "kartoffel",
+    potato: "kartoffel",
 
-    kartoffel: "potato",
-    kartoffeln: "potato",
+    eier: "ei",
+    egg: "ei",
 
-    ei: "egg",
-    eier: "egg",
+    bread: "brot",
+    oats: "hafer",
+    oat: "hafer",
+    haferflocken: "hafer",
 
-    brot: "bread",
-    toast: "bread",
+    curd: "quark",
+    salmon: "lachs",
+    tuna: "thunfisch",
 
-    hafer: "oat",
-    haferflocken: "oat",
+    tomatoes: "tomate",
+    tomaten: "tomate",
+    tomato: "tomate",
 
-    quark: "curd",
-    skyr: "yogurt",
+    cucumber: "gurke",
+    gurken: "gurke",
 
-    lachs: "salmon",
-    thunfisch: "tuna",
-
-    tomate: "tomato",
-    tomaten: "tomato",
-
-    gurke: "cucumber",
-    gurken: "cucumber",
-
-    salat: "lettuce"
+    lettuce: "salat"
   };
 
   return query
     .toLowerCase()
     .trim()
-    .replaceAll("ä", "ae")
-    .replaceAll("ö", "oe")
-    .replaceAll("ü", "ue")
-    .replaceAll("ß", "ss")
     .replace(/[.,;:!?()[\]{}]/g, " ")
     .split(/\s+/)
     .map(word => replacements[word] || word)
@@ -221,24 +282,24 @@ function renderFavoritesDropdown() {
 
 function favoriteToFoodObject(favorite) {
   return {
-    NDB_No: favorite.food_id,
-    Shrt_Desc: favorite.food_name,
-    Energ_Kcal: favorite.calories,
-    "Protein_(g)": favorite.protein_g,
-    "Carbohydrt_(g)": favorite.carbs_g,
-    "Lipid_Tot_(g)": favorite.fat_g
+    [BLS_COLUMNS.id]: favorite.food_id,
+    [BLS_COLUMNS.nameDe]: favorite.food_name,
+    [BLS_COLUMNS.calories]: favorite.calories,
+    [BLS_COLUMNS.protein]: favorite.protein_g,
+    [BLS_COLUMNS.carbs]: favorite.carbs_g,
+    [BLS_COLUMNS.fat]: favorite.fat_g
   };
 }
 
 function loadSelectedFavorite() {
-  const foodId = Number(favoriteSelect.value);
+  const foodId = String(favoriteSelect.value).trim();
 
   if (!foodId) {
     alert("Bitte Favorit auswählen.");
     return;
   }
 
-  const favorite = favorites.find(item => Number(item.food_id) === foodId);
+  const favorite = favorites.find(item => String(item.food_id) === foodId);
 
   if (!favorite) {
     alert("Favorit wurde nicht gefunden.");
@@ -256,10 +317,11 @@ async function saveSelectedFoodAsFavorite() {
   }
 
   const nutrition = getFoodNutritionPer100g(selectedFood);
-  const foodId = toNumber(selectedFood.NDB_No);
+  const foodId = getFoodId(selectedFood);
+  const foodName = getFoodName(selectedFood);
 
   if (!foodId) {
-    alert("Dieses Lebensmittel hat keine gültige ID.");
+    alert("Dieses Lebensmittel hat keine gültige BLS-ID.");
     return;
   }
 
@@ -268,7 +330,7 @@ async function saveSelectedFoodAsFavorite() {
     .upsert(
       {
         food_id: foodId,
-        food_name: selectedFood.Shrt_Desc || "Unbekanntes Lebensmittel",
+        food_name: foodName,
         calories: nutrition.calories,
         protein_g: nutrition.protein,
         carbs_g: nutrition.carbs,
@@ -289,7 +351,7 @@ async function saveSelectedFoodAsFavorite() {
 }
 
 async function deleteSelectedFavorite() {
-  const foodId = Number(favoriteSelect.value);
+  const foodId = String(favoriteSelect.value).trim();
 
   if (!foodId) {
     alert("Bitte Favorit auswählen.");
@@ -336,13 +398,13 @@ async function searchFoods() {
     .limit(40);
 
   searchTerms.forEach(term => {
-    request = request.ilike("Shrt_Desc", `%${term}%`);
+    request = request.ilike(BLS_COLUMNS.nameDe, `%${term}%`);
   });
 
   const { data, error } = await request;
 
   if (error) {
-    console.error("Fehler bei der Wildcard-Suche:", error);
+    console.error("Fehler bei der Suche:", error);
     foodResults.innerHTML = "<p>Suche hat nicht geklappt.</p>";
     return;
   }
@@ -354,8 +416,8 @@ function sortFoodResults(foods, searchTerms) {
   if (!foods) return [];
 
   return foods.sort((a, b) => {
-    const nameA = String(a.Shrt_Desc || "").toLowerCase();
-    const nameB = String(b.Shrt_Desc || "").toLowerCase();
+    const nameA = getFoodName(a).toLowerCase();
+    const nameB = getFoodName(b).toLowerCase();
 
     const scoreA = getSearchScore(nameA, searchTerms);
     const scoreB = getSearchScore(nameB, searchTerms);
@@ -387,12 +449,13 @@ function renderFoodResults(foods) {
 
   foods.forEach(food => {
     const nutrition = getFoodNutritionPer100g(food);
+    const foodName = getFoodName(food);
 
     const div = document.createElement("div");
     div.className = "food-result";
 
     div.innerHTML = `
-      <strong>${food.Shrt_Desc || "Unbekanntes Lebensmittel"}</strong>
+      <strong>${foodName}</strong>
       <small>
         ${nutrition.calories} kcal · 
         Protein ${nutrition.protein} g · 
@@ -410,7 +473,7 @@ function renderFoodResults(foods) {
 function selectFood(food) {
   selectedFood = food;
 
-  selectedFoodName.textContent = food.Shrt_Desc || "Unbekanntes Lebensmittel";
+  selectedFoodName.textContent = getFoodName(food);
   selectedFoodBox.classList.remove("hidden");
 
   updateNutritionPreview();
@@ -449,8 +512,8 @@ async function saveMeal() {
   const { error } = await supabaseClient
     .from("meal_logs")
     .insert({
-      food_id: toNumber(selectedFood.NDB_No),
-      food_name: selectedFood.Shrt_Desc || "Unbekanntes Lebensmittel",
+      food_id: getFoodId(selectedFood),
+      food_name: getFoodName(selectedFood),
       meal_category: mealCategoryInput.value,
       amount_g: amountG,
       calories: nutrition.calories,
