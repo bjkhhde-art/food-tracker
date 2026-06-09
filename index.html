@@ -27,7 +27,18 @@
   <main>
 
     <section id="dashboard" class="card">
-      <h2>Heute</h2>
+      <h2>Dashboard</h2>
+
+      <div class="dashboard-controls">
+        <div>
+          <label>Tag auswählen</label>
+          <input id="dashboardDateInput" type="date">
+        </div>
+
+        <button id="prevDayBtn" class="small-btn">← Vortag</button>
+        <button id="todayBtn" class="small-btn">Heute</button>
+        <button id="nextDayBtn" class="small-btn">Nächster Tag →</button>
+      </div>
 
       <div class="summary-grid">
         <div class="summary-box">
@@ -58,7 +69,7 @@
       <div class="chart-card">
         <div class="chart-header">
           <div>
-            <h3>Kalorienverlauf heute 📈</h3>
+            <h3>Kalorienverlauf am Tag 📈</h3>
             <small id="dailyChartInfo">Kumulierte Kalorien über den Tag</small>
           </div>
 
@@ -68,7 +79,35 @@
         <div id="dailyCalorieChart" class="daily-chart"></div>
       </div>
 
-      <h3>Heutige Mahlzeiten</h3>
+      <div class="chart-grid-two">
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <h3>Wochenübersicht 📅</h3>
+              <small id="weeklyChartInfo">Kalorien pro Tag</small>
+            </div>
+
+            <strong id="weeklyChartTotal">0 kcal</strong>
+          </div>
+
+          <div id="weeklyCalorieChart" class="daily-chart"></div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <h3>30-Tage-Trend 🔥</h3>
+              <small id="trendChartInfo">Kalorientrend der letzten Tage</small>
+            </div>
+
+            <strong id="trendChartAverage">0 kcal Ø</strong>
+          </div>
+
+          <div id="trendCalorieChart" class="daily-chart"></div>
+        </div>
+      </div>
+
+      <h3 id="dayMealsTitle">Mahlzeiten am ausgewählten Tag</h3>
       <div id="todayMeals" class="meal-list"></div>
     </section>
 
