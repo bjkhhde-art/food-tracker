@@ -4,7 +4,7 @@ const SUPABASE_KEY = "sb_publishable_uunR3UQ9rttiK8dG85IedQ__Tn1duVK";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Falls du die USDA-Tabelle später umbenennst, hier ändern:
-const FOOD_TABLE = "USDA Standard Reference Release 21";
+const FOOD_TABLE = "usda_foods";
 
 const foodSearchInput = document.getElementById("foodSearchInput");
 const searchFoodBtn = document.getElementById("searchFoodBtn");
