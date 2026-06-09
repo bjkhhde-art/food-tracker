@@ -62,6 +62,18 @@
     <section id="mealTracker" class="card">
       <h2>Mahlzeit erfassen 🍽️</h2>
 
+      <div class="favorite-box">
+        <label>Favoriten</label>
+        <div class="favorite-row">
+          <select id="favoriteSelect">
+            <option value="">Favorit auswählen</option>
+          </select>
+
+          <button id="loadFavoriteBtn" class="small-btn">Laden</button>
+          <button id="deleteFavoriteBtn" class="small-btn danger-btn">Löschen</button>
+        </div>
+      </div>
+
       <div class="form-grid">
         <div>
           <label>Lebensmittel suchen</label>
@@ -76,6 +88,8 @@
       <div id="selectedFoodBox" class="selected-food hidden">
         <h3>Ausgewählt</h3>
         <p id="selectedFoodName"></p>
+
+        <button id="saveFavoriteBtn" class="favorite-btn">⭐ Als Favorit speichern</button>
 
         <div class="form-grid">
           <div>
