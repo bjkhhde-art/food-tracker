@@ -145,6 +145,35 @@ button {
   display: none;
 }
 
+.favorite-box {
+  background: #f7f3ef;
+  border-radius: 20px;
+  padding: 16px;
+  margin-bottom: 18px;
+}
+
+.favorite-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+}
+
+.small-btn {
+  padding: 12px 14px;
+  white-space: nowrap;
+}
+
+.danger-btn {
+  background: #ef4444;
+}
+
+.favorite-btn {
+  background: #ffb703;
+  color: #111;
+  width: 100%;
+  margin-bottom: 16px;
+}
+
 .food-results {
   margin-top: 18px;
   display: flex;
@@ -260,6 +289,10 @@ button {
   }
 
   .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .favorite-row {
     grid-template-columns: 1fr;
   }
 }
