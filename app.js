@@ -3,12 +3,16 @@ const SUPABASE_KEY = "sb_publishable_uunR3UQ9rttiK8dG85IedQ__Tn1duVK";
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Falls du die USDA-Tabelle später umbenennst, hier ändern:
 const FOOD_TABLE = "usda_foods";
 
 const foodSearchInput = document.getElementById("foodSearchInput");
 const searchFoodBtn = document.getElementById("searchFoodBtn");
 const foodResults = document.getElementById("foodResults");
+
+const favoriteSelect = document.getElementById("favoriteSelect");
+const loadFavoriteBtn = document.getElementById("loadFavoriteBtn");
+const deleteFavoriteBtn = document.getElementById("deleteFavoriteBtn");
+const saveFavoriteBtn = document.getElementById("saveFavoriteBtn");
 
 const selectedFoodBox = document.getElementById("selectedFoodBox");
 const selectedFoodName = document.getElementById("selectedFoodName");
@@ -47,6 +51,7 @@ const saveProfileBtn = document.getElementById("saveProfileBtn");
 
 let selectedFood = null;
 let profile = null;
+let favorites = [];
 
 function initDefaults() {
   eatenAtInput.value = toLocalDateTimeInput(new Date());
@@ -83,10 +88,10 @@ function getValue(food, possibleNames) {
 
 function getFoodNutritionPer100g(food) {
   return {
-    calories: toNumber(getValue(food, ["Energ_Kcal", "Energy_Kcal", "Calories"])),
-    protein: toNumber(getValue(food, ["Protein_(g)", "Protein_g", "Protein"])),
-    carbs: toNumber(getValue(food, ["Carbohydrt_(g)", "Carbohydrate_(g)", "Carbs_(g)", "Carbs"])),
-    fat: toNumber(getValue(food, ["Lipid_Tot_(g)", "Fat_(g)", "Fat_g", "Fat"]))
+    calories: toNumber(getValue(food, ["Energ_Kcal", "Energy_Kcal", "Calories", "calories"])),
+    protein: toNumber(getValue(food, ["Protein_(g)", "Protein_g", "Protein", "protein_g"])),
+    carbs: toNumber(getValue(food, ["Carbohydrt_(g)", "Carbohydrate_(g)", "Carbs_(g)", "Carbs", "carbs_g"])),
+    fat: toNumber(getValue(food, ["Lipid_Tot_(g)", "Fat_(g)", "Fat_g", "Fat", "fat_g"]))
   };
 }
 
@@ -100,6 +105,126 @@ function calculateNutritionForAmount(food, amountG) {
     carbs: round(per100g.carbs * factor, 1),
     fat: round(per100g.fat * factor, 1)
   };
+}
+
+async function loadFavorites() {
+  const { data, error } = await supabaseClient
+    .from("food_favorites")
+    .select("*")
+    .order("food_name", { ascending: true });
+
+  if (error) {
+    console.error("Fehler beim Laden der Favoriten:", error);
+    return;
+  }
+
+  favorites = data || [];
+  renderFavoritesDropdown();
+}
+
+function renderFavoritesDropdown() {
+  favoriteSelect.innerHTML = `<option value="">Favorit auswählen</option>`;
+
+  favorites.forEach(favorite => {
+    const option = document.createElement("option");
+    option.value = favorite.food_id;
+    option.textContent = favorite.food_name;
+    favoriteSelect.appendChild(option);
+  });
+}
+
+function favoriteToFoodObject(favorite) {
+  return {
+    NDB_No: favorite.food_id,
+    Shrt_Desc: favorite.food_name,
+    Energ_Kcal: favorite.calories,
+    "Protein_(g)": favorite.protein_g,
+    "Carbohydrt_(g)": favorite.carbs_g,
+    "Lipid_Tot_(g)": favorite.fat_g
+  };
+}
+
+function loadSelectedFavorite() {
+  const foodId = Number(favoriteSelect.value);
+
+  if (!foodId) {
+    alert("Bitte Favorit auswählen.");
+    return;
+  }
+
+  const favorite = favorites.find(item => Number(item.food_id) === foodId);
+
+  if (!favorite) {
+    alert("Favorit wurde nicht gefunden.");
+    return;
+  }
+
+  const food = favoriteToFoodObject(favorite);
+  selectFood(food);
+}
+
+async function saveSelectedFoodAsFavorite() {
+  if (!selectedFood) {
+    alert("Bitte erst ein Lebensmittel auswählen.");
+    return;
+  }
+
+  const nutrition = getFoodNutritionPer100g(selectedFood);
+  const foodId = toNumber(selectedFood.NDB_No);
+
+  if (!foodId) {
+    alert("Dieses Lebensmittel hat keine gültige ID.");
+    return;
+  }
+
+  const { error } = await supabaseClient
+    .from("food_favorites")
+    .upsert(
+      {
+        food_id: foodId,
+        food_name: selectedFood.Shrt_Desc || "Unbekanntes Lebensmittel",
+        calories: nutrition.calories,
+        protein_g: nutrition.protein,
+        carbs_g: nutrition.carbs,
+        fat_g: nutrition.fat
+      },
+      { onConflict: "food_id" }
+    );
+
+  if (error) {
+    console.error("Fehler beim Speichern des Favoriten:", error);
+    alert("Favorit konnte nicht gespeichert werden.");
+    return;
+  }
+
+  await loadFavorites();
+  favoriteSelect.value = String(foodId);
+  alert("Favorit gespeichert.");
+}
+
+async function deleteSelectedFavorite() {
+  const foodId = Number(favoriteSelect.value);
+
+  if (!foodId) {
+    alert("Bitte Favorit auswählen.");
+    return;
+  }
+
+  if (!confirm("Favorit wirklich löschen?")) return;
+
+  const { error } = await supabaseClient
+    .from("food_favorites")
+    .delete()
+    .eq("food_id", foodId);
+
+  if (error) {
+    console.error("Fehler beim Löschen des Favoriten:", error);
+    alert("Favorit konnte nicht gelöscht werden.");
+    return;
+  }
+
+  favoriteSelect.value = "";
+  await loadFavorites();
 }
 
 async function searchFoods() {
@@ -520,6 +645,16 @@ foodSearchInput.addEventListener("keydown", event => {
   }
 });
 
+favoriteSelect.addEventListener("change", () => {
+  if (favoriteSelect.value) {
+    loadSelectedFavorite();
+  }
+});
+
+loadFavoriteBtn.addEventListener("click", loadSelectedFavorite);
+deleteFavoriteBtn.addEventListener("click", deleteSelectedFavorite);
+saveFavoriteBtn.addEventListener("click", saveSelectedFoodAsFavorite);
+
 amountInput.addEventListener("input", updateNutritionPreview);
 saveMealBtn.addEventListener("click", saveMeal);
 saveWeightBtn.addEventListener("click", saveWeight);
@@ -528,6 +663,7 @@ saveProfileBtn.addEventListener("click", saveProfile);
 async function initApp() {
   initDefaults();
   await loadProfile();
+  await loadFavorites();
   await loadTodayMeals();
   await loadWeights();
 }
