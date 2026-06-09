@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Food Tracker</title>
+
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="apple-touch-icon" href="favicon.svg">
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="app-header">
+    <h1>Food Tracker 🥗</h1>
+    <p>Kalorien, Makros, Mahlzeiten & Gewicht im Blick.</p>
+  </header>
+
+  <nav class="main-nav">
+    <a href="#dashboard">📊 Dashboard</a>
+    <a href="#mealTracker">🍽️ Mahlzeit</a>
+    <a href="#weightTracker">⚖️ Gewicht</a>
+    <a href="#profile">⚙️ Profil</a>
+  </nav>
+
+  <main>
+
+    <section id="dashboard" class="card">
+      <h2>Heute</h2>
+
+      <div class="summary-grid">
+        <div class="summary-box">
+          <span>Kalorien</span>
+          <strong id="todayCalories">0 kcal</strong>
+          <div class="progress-bar">
+            <div id="calorieProgress" class="progress-fill"></div>
+          </div>
+          <small id="calorieGoalText">Ziel: nicht gesetzt</small>
+        </div>
+
+        <div class="summary-box">
+          <span>Protein</span>
+          <strong id="todayProtein">0 g</strong>
+        </div>
+
+        <div class="summary-box">
+          <span>Kohlenhydrate</span>
+          <strong id="todayCarbs">0 g</strong>
+        </div>
+
+        <div class="summary-box">
+          <span>Fett</span>
+          <strong id="todayFat">0 g</strong>
+        </div>
+      </div>
+
+      <h3>Heutige Mahlzeiten</h3>
+      <div id="todayMeals" class="meal-list"></div>
+    </section>
+
+    <section id="mealTracker" class="card">
+      <h2>Mahlzeit erfassen 🍽️</h2>
+
+      <div class="form-grid">
+        <div>
+          <label>Lebensmittel suchen</label>
+          <input id="foodSearchInput" type="text" placeholder="z. B. Banana, Chicken, Rice">
+        </div>
+
+        <button id="searchFoodBtn">Suchen</button>
+      </div>
+
+      <div id="foodResults" class="food-results"></div>
+
+      <div id="selectedFoodBox" class="selected-food hidden">
+        <h3>Ausgewählt</h3>
+        <p id="selectedFoodName"></p>
+
+        <div class="form-grid">
+          <div>
+            <label>Menge in Gramm</label>
+            <input id="amountInput" type="number" min="1" value="100">
+          </div>
+
+          <div>
+            <label>Kategorie</label>
+            <select id="mealCategoryInput">
+              <option value="Frühstück">Frühstück</option>
+              <option value="Mittagessen">Mittagessen</option>
+              <option value="Abendessen">Abendessen</option>
+              <option value="Snack">Snack</option>
+            </select>
+          </div>
+
+          <div>
+            <label>Datum & Uhrzeit</label>
+            <input id="eatenAtInput" type="datetime-local">
+          </div>
+        </div>
+
+        <div class="nutrition-preview">
+          <div>
+            <span>Kalorien</span>
+            <strong id="previewCalories">0 kcal</strong>
+          </div>
+          <div>
+            <span>Protein</span>
+            <strong id="previewProtein">0 g</strong>
+          </div>
+          <div>
+            <span>Kohlenhydrate</span>
+            <strong id="previewCarbs">0 g</strong>
+          </div>
+          <div>
+            <span>Fett</span>
+            <strong id="previewFat">0 g</strong>
+          </div>
+        </div>
+
+        <button id="saveMealBtn" class="primary-btn">Mahlzeit speichern</button>
+      </div>
+    </section>
+
+    <section id="weightTracker" class="card">
+      <h2>Gewicht tracken ⚖️</h2>
+
+      <div class="form-grid">
+        <div>
+          <label>Gewicht in kg</label>
+          <input id="weightInput" type="number" step="0.1" placeholder="z. B. 78.5">
+        </div>
+
+        <div>
+          <label>Datum</label>
+          <input id="weightDateInput" type="date">
+        </div>
+
+        <button id="saveWeightBtn">Gewicht speichern</button>
+      </div>
+
+      <div id="weightSummary" class="weight-summary"></div>
+
+      <h3>Letzte Einträge</h3>
+      <div id="weightList" class="weight-list"></div>
+    </section>
+
+    <section id="profile" class="card">
+      <h2>Profil & Ziele ⚙️</h2>
+
+      <div class="form-grid">
+        <div>
+          <label>Name</label>
+          <input id="profileNameInput" type="text" placeholder="Name">
+        </div>
+
+        <div>
+          <label>Alter</label>
+          <input id="profileAgeInput" type="number" placeholder="Alter">
+        </div>
+
+        <div>
+          <label>Geschlecht</label>
+          <select id="profileGenderInput">
+            <option value="">Bitte wählen</option>
+            <option value="male">Männlich</option>
+            <option value="female">Weiblich</option>
+            <option value="other">Divers</option>
+          </select>
+        </div>
+
+        <div>
+          <label>Größe in cm</label>
+          <input id="profileHeightInput" type="number" placeholder="z. B. 180">
+        </div>
+
+        <div>
+          <label>Aktivitätslevel</label>
+          <select id="profileActivityInput">
+            <option value="">Bitte wählen</option>
+            <option value="low">Wenig aktiv</option>
+            <option value="medium">Normal aktiv</option>
+            <option value="high">Sehr aktiv</option>
+          </select>
+        </div>
+
+        <div>
+          <label>Zielgewicht in kg</label>
+          <input id="targetWeightInput" type="number" step="0.1" placeholder="z. B. 75">
+        </div>
+
+        <div>
+          <label>Tägliches Kalorienziel</label>
+          <input id="dailyCalorieGoalInput" type="number" placeholder="z. B. 2300">
+        </div>
+      </div>
+
+      <button id="saveProfileBtn" class="primary-btn">Profil speichern</button>
+    </section>
+
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app.js"></script>
+</body>
+</html>
