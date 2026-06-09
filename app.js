@@ -44,9 +44,23 @@ const calorieProgress = document.getElementById("calorieProgress");
 const calorieGoalText = document.getElementById("calorieGoalText");
 const todayMeals = document.getElementById("todayMeals");
 
+const dashboardDateInput = document.getElementById("dashboardDateInput");
+const prevDayBtn = document.getElementById("prevDayBtn");
+const todayBtn = document.getElementById("todayBtn");
+const nextDayBtn = document.getElementById("nextDayBtn");
+const dayMealsTitle = document.getElementById("dayMealsTitle");
+
 const dailyCalorieChart = document.getElementById("dailyCalorieChart");
 const dailyChartTotal = document.getElementById("dailyChartTotal");
 const dailyChartInfo = document.getElementById("dailyChartInfo");
+
+const weeklyCalorieChart = document.getElementById("weeklyCalorieChart");
+const weeklyChartTotal = document.getElementById("weeklyChartTotal");
+const weeklyChartInfo = document.getElementById("weeklyChartInfo");
+
+const trendCalorieChart = document.getElementById("trendCalorieChart");
+const trendChartAverage = document.getElementById("trendChartAverage");
+const trendChartInfo = document.getElementById("trendChartInfo");
 
 const weightInput = document.getElementById("weightInput");
 const weightDateInput = document.getElementById("weightDateInput");
@@ -68,8 +82,14 @@ let profile = null;
 let favorites = [];
 
 function initDefaults() {
-  eatenAtInput.value = toLocalDateTimeInput(new Date());
-  weightDateInput.value = toDateInput(new Date());
+  const today = new Date();
+
+  eatenAtInput.value = toLocalDateTimeInput(today);
+  weightDateInput.value = toDateInput(today);
+
+  if (dashboardDateInput) {
+    dashboardDateInput.value = toDateInput(today);
+  }
 }
 
 function toLocalDateTimeInput(date) {
@@ -543,12 +563,83 @@ async function saveMeal() {
   await loadTodayMeals();
 }
 
-async function loadTodayMeals() {
-  const start = new Date();
+function getSelectedDashboardDateString() {
+  if (dashboardDateInput && dashboardDateInput.value) {
+    return dashboardDateInput.value;
+  }
+
+  return toDateInput(new Date());
+}
+
+function parseDateInput(dateString) {
+  const [year, month, day] = dateString.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function getDayRange(dateString) {
+  const start = parseDateInput(dateString);
   start.setHours(0, 0, 0, 0);
 
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
+
+  return { start, end };
+}
+
+function addDays(date, days) {
+  const copy = new Date(date);
+  copy.setDate(copy.getDate() + days);
+  return copy;
+}
+
+function isSameLocalDay(dateA, dateB) {
+  return toDateInput(dateA) === toDateInput(dateB);
+}
+
+function getMonday(date) {
+  const copy = new Date(date);
+  const day = copy.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+
+  copy.setDate(copy.getDate() + diff);
+  copy.setHours(0, 0, 0, 0);
+
+  return copy;
+}
+
+function formatDashboardDate(dateString) {
+  const date = parseDateInput(dateString);
+
+  if (isSameLocalDay(date, new Date())) {
+    return "Heute";
+  }
+
+  const yesterday = addDays(new Date(), -1);
+  const tomorrow = addDays(new Date(), 1);
+
+  if (isSameLocalDay(date, yesterday)) {
+    return "Gestern";
+  }
+
+  if (isSameLocalDay(date, tomorrow)) {
+    return "Morgen";
+  }
+
+  return date.toLocaleDateString("de-DE", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  });
+}
+
+async function loadTodayMeals() {
+  const selectedDateString = getSelectedDashboardDateString();
+  const { start, end } = getDayRange(selectedDateString);
+
+  if (dayMealsTitle) {
+    dayMealsTitle.textContent = `Mahlzeiten · ${formatDashboardDate(selectedDateString)}`;
+  }
 
   const { data, error } = await supabaseClient
     .from("meal_logs")
@@ -565,14 +656,16 @@ async function loadTodayMeals() {
 
   renderTodayMeals(data);
   updateTodaySummary(data);
-  renderDailyCalorieChart(data);
+  renderDailyCalorieChart(data, selectedDateString);
+
+  await loadWeeklyAndTrendCharts(selectedDateString);
 }
 
 function renderTodayMeals(meals) {
   todayMeals.innerHTML = "";
 
   if (!meals || meals.length === 0) {
-    todayMeals.innerHTML = "<p>Noch keine Mahlzeiten heute.</p>";
+    todayMeals.innerHTML = "<p>Für diesen Tag sind noch keine Mahlzeiten eingetragen.</p>";
     return;
   }
 
@@ -602,7 +695,7 @@ function renderTodayMeals(meals) {
 }
 
 function updateTodaySummary(meals) {
-  const totals = meals.reduce(
+  const totals = (meals || []).reduce(
     (sum, meal) => {
       sum.calories += toNumber(meal.calories);
       sum.protein += toNumber(meal.protein_g);
@@ -630,7 +723,7 @@ function updateTodaySummary(meals) {
   }
 }
 
-function renderDailyCalorieChart(meals) {
+function renderDailyCalorieChart(meals, selectedDateString) {
   if (!dailyCalorieChart) return;
 
   const sortedMeals = (meals || [])
@@ -644,10 +737,10 @@ function renderDailyCalorieChart(meals) {
   dailyChartTotal.textContent = `${round(totalCalories, 0)} kcal`;
 
   if (sortedMeals.length === 0) {
-    dailyChartInfo.textContent = "Noch keine Mahlzeiten heute.";
+    dailyChartInfo.textContent = "Noch keine Mahlzeiten an diesem Tag.";
     dailyCalorieChart.innerHTML = `
       <div class="chart-empty">
-        Sobald du eine Mahlzeit speicherst, entsteht hier dein Tagesverlauf.
+        Für diesen Tag gibt es noch keinen Kalorienverlauf.
       </div>
     `;
     return;
@@ -660,44 +753,36 @@ function renderDailyCalorieChart(meals) {
   const maxY = Math.max(totalCalories, goal, 100);
 
   const width = 760;
-  const height = 260;
-
+  const height = 280;
   const paddingLeft = 58;
-  const paddingRight = 24;
-  const paddingTop = 22;
-  const paddingBottom = 44;
+  const paddingRight = 26;
+  const paddingTop = 24;
+  const paddingBottom = 46;
 
   const chartWidth = width - paddingLeft - paddingRight;
   const chartHeight = height - paddingTop - paddingBottom;
 
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-
-  const endOfDay = new Date(startOfDay);
-  endOfDay.setDate(endOfDay.getDate() + 1);
+  const { start, end } = getDayRange(selectedDateString);
 
   function getX(dateValue) {
     const date = new Date(dateValue);
-    const progress = (date - startOfDay) / (endOfDay - startOfDay);
-    const clampedProgress = Math.min(Math.max(progress, 0), 1);
+    const progress = (date - start) / (end - start);
+    const clamped = Math.min(Math.max(progress, 0), 1);
 
-    return paddingLeft + clampedProgress * chartWidth;
+    return paddingLeft + clamped * chartWidth;
   }
 
   function getY(kcal) {
     return paddingTop + chartHeight - (kcal / maxY) * chartHeight;
   }
 
-  const gridValues = [0, 0.25, 0.5, 0.75, 1].map(factor => round(maxY * factor, 0));
-
-  const gridLines = gridValues.map(value => {
-    const y = getY(value);
-
-    return `
-      <line class="chart-grid-line" x1="${paddingLeft}" y1="${y}" x2="${width - paddingRight}" y2="${y}"></line>
-      <text class="chart-y-label" x="${paddingLeft - 10}" y="${y + 4}" text-anchor="end">${value}</text>
-    `;
-  }).join("");
+  const gridLines = buildGridLines({
+    width,
+    paddingLeft,
+    paddingRight,
+    maxY,
+    getY
+  });
 
   const xLabels = [
     { label: "00:00", hour: 0 },
@@ -706,10 +791,10 @@ function renderDailyCalorieChart(meals) {
     { label: "18:00", hour: 18 },
     { label: "24:00", hour: 24 }
   ].map(item => {
-    const date = new Date(startOfDay);
-    date.setHours(item.hour, 0, 0, 0);
+    const labelDate = new Date(start);
+    labelDate.setHours(item.hour, 0, 0, 0);
 
-    const x = item.hour === 24 ? width - paddingRight : getX(date);
+    const x = item.hour === 24 ? width - paddingRight : getX(labelDate);
 
     return `
       <text class="chart-x-label" x="${x}" y="${height - 16}" text-anchor="middle">${item.label}</text>
@@ -717,43 +802,55 @@ function renderDailyCalorieChart(meals) {
   }).join("");
 
   let runningCalories = 0;
-  let currentY = getY(0);
-  let path = `M ${paddingLeft} ${currentY}`;
+
+  const points = [
+    {
+      x: paddingLeft,
+      y: getY(0)
+    }
+  ];
 
   const dots = sortedMeals.map(meal => {
-    const x = getX(meal.eaten_at);
-
     runningCalories += toNumber(meal.calories);
-    const newY = getY(runningCalories);
 
-    path += ` L ${x} ${currentY} L ${x} ${newY}`;
-    currentY = newY;
+    const x = getX(meal.eaten_at);
+    const y = getY(runningCalories);
+
+    points.push({ x, y });
 
     return `
-      <circle class="chart-dot" cx="${x}" cy="${newY}" r="6">
+      <circle class="chart-dot" cx="${x}" cy="${y}" r="6">
         <title>${escapeHtml(meal.food_name)} · ${round(meal.calories, 0)} kcal · Gesamt: ${round(runningCalories, 0)} kcal</title>
       </circle>
     `;
   }).join("");
 
-  const lastMealTime = new Date(sortedMeals[sortedMeals.length - 1].eaten_at);
+  const selectedDate = parseDateInput(selectedDateString);
   const now = new Date();
-  const lineEndDate = now > lastMealTime ? now : lastMealTime;
-  path += ` L ${getX(lineEndDate)} ${currentY}`;
 
-  let goalLine = "";
+  let lineEndDate = end;
 
-  if (goal > 0) {
-    const goalY = getY(goal);
-
-    goalLine = `
-      <line class="chart-goal-line" x1="${paddingLeft}" y1="${goalY}" x2="${width - paddingRight}" y2="${goalY}"></line>
-      <text class="chart-goal-label" x="${width - paddingRight}" y="${goalY - 8}" text-anchor="end">Ziel ${goal} kcal</text>
-    `;
+  if (isSameLocalDay(selectedDate, now)) {
+    lineEndDate = now;
   }
 
+  points.push({
+    x: getX(lineEndDate),
+    y: getY(runningCalories)
+  });
+
+  const path = pointsToPath(points);
+
+  const goalLine = buildGoalLine({
+    goal,
+    getY,
+    width,
+    paddingLeft,
+    paddingRight
+  });
+
   dailyCalorieChart.innerHTML = `
-    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Kalorienverlauf heute">
+    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Kalorienverlauf am Tag">
       ${gridLines}
       ${xLabels}
       ${goalLine}
@@ -763,13 +860,303 @@ function renderDailyCalorieChart(meals) {
   `;
 }
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+async function loadWeeklyAndTrendCharts(selectedDateString) {
+  const selectedDate = parseDateInput(selectedDateString);
+
+  const weekStart = getMonday(selectedDate);
+  const weekEnd = addDays(weekStart, 7);
+
+  const trendStart = addDays(selectedDate, -29);
+  trendStart.setHours(0, 0, 0, 0);
+
+  const trendEnd = addDays(selectedDate, 1);
+  trendEnd.setHours(0, 0, 0, 0);
+
+  const [weeklyResult, trendResult] = await Promise.all([
+    supabaseClient
+      .from("meal_logs")
+      .select("*")
+      .gte("eaten_at", weekStart.toISOString())
+      .lt("eaten_at", weekEnd.toISOString()),
+
+    supabaseClient
+      .from("meal_logs")
+      .select("*")
+      .gte("eaten_at", trendStart.toISOString())
+      .lt("eaten_at", trendEnd.toISOString())
+  ]);
+
+  if (weeklyResult.error) {
+    console.error("Fehler beim Laden der Wochenwerte:", weeklyResult.error);
+    weeklyCalorieChart.innerHTML = "<p>Wochenwerte konnten nicht geladen werden.</p>";
+  } else {
+    renderWeeklyCalorieChart(weeklyResult.data || [], weekStart);
+  }
+
+  if (trendResult.error) {
+    console.error("Fehler beim Laden des Trends:", trendResult.error);
+    trendCalorieChart.innerHTML = "<p>Trendwerte konnten nicht geladen werden.</p>";
+  } else {
+    renderTrendCalorieChart(trendResult.data || [], trendStart, 30);
+  }
+}
+
+function createDailyTotals(meals, startDate, days) {
+  const totals = [];
+
+  for (let i = 0; i < days; i++) {
+    const date = addDays(startDate, i);
+    const key = toDateInput(date);
+
+    totals.push({
+      date,
+      key,
+      calories: 0
+    });
+  }
+
+  meals.forEach(meal => {
+    const key = toDateInput(new Date(meal.eaten_at));
+    const entry = totals.find(item => item.key === key);
+
+    if (entry) {
+      entry.calories += toNumber(meal.calories);
+    }
+  });
+
+  return totals;
+}
+
+function renderWeeklyCalorieChart(meals, weekStart) {
+  if (!weeklyCalorieChart) return;
+
+  const days = createDailyTotals(meals, weekStart, 7);
+  const weeklyTotal = days.reduce((sum, day) => sum + day.calories, 0);
+
+  weeklyChartTotal.textContent = `${round(weeklyTotal, 0)} kcal`;
+  weeklyChartInfo.textContent =
+    `${formatShortDate(days[0].date)} bis ${formatShortDate(days[6].date)}`;
+
+  renderSimpleLineChart({
+    container: weeklyCalorieChart,
+    points: days.map(day => ({
+      label: day.date.toLocaleDateString("de-DE", { weekday: "short" }),
+      title: `${day.date.toLocaleDateString("de-DE")} · ${round(day.calories, 0)} kcal`,
+      value: day.calories
+    })),
+    goal: profile?.daily_calorie_goal ? toNumber(profile.daily_calorie_goal) : 0,
+    emptyText: "Für diese Woche sind noch keine Mahlzeiten eingetragen.",
+    showAllLabels: true
+  });
+}
+
+function renderTrendCalorieChart(meals, trendStart, daysCount) {
+  if (!trendCalorieChart) return;
+
+  const days = createDailyTotals(meals, trendStart, daysCount);
+  const total = days.reduce((sum, day) => sum + day.calories, 0);
+  const average = daysCount > 0 ? total / daysCount : 0;
+
+  trendChartAverage.textContent = `${round(average, 0)} kcal Ø`;
+  trendChartInfo.textContent =
+    `${formatShortDate(days[0].date)} bis ${formatShortDate(days[days.length - 1].date)}`;
+
+  const movingAverage = days.map((day, index) => {
+    const startIndex = Math.max(0, index - 6);
+    const relevantDays = days.slice(startIndex, index + 1);
+    const relevantTotal = relevantDays.reduce((sum, item) => sum + item.calories, 0);
+
+    return relevantTotal / relevantDays.length;
+  });
+
+  renderSimpleLineChart({
+    container: trendCalorieChart,
+    points: days.map((day, index) => ({
+      label: index % 7 === 0 || index === days.length - 1
+        ? day.date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })
+        : "",
+      title: `${day.date.toLocaleDateString("de-DE")} · ${round(day.calories, 0)} kcal`,
+      value: day.calories,
+      average: movingAverage[index]
+    })),
+    goal: profile?.daily_calorie_goal ? toNumber(profile.daily_calorie_goal) : 0,
+    emptyText: "Noch keine Daten für den 30-Tage-Trend.",
+    showAverage: true
+  });
+}
+
+function renderSimpleLineChart({
+  container,
+  points,
+  goal = 0,
+  emptyText = "Keine Daten vorhanden.",
+  showAllLabels = false,
+  showAverage = false
+}) {
+  const hasData = points.some(point => toNumber(point.value) > 0);
+
+  if (!hasData) {
+    container.innerHTML = `
+      <div class="chart-empty">
+        ${emptyText}
+      </div>
+    `;
+    return;
+  }
+
+  const width = 760;
+  const height = 280;
+  const paddingLeft = 58;
+  const paddingRight = 26;
+  const paddingTop = 24;
+  const paddingBottom = 46;
+
+  const chartWidth = width - paddingLeft - paddingRight;
+  const chartHeight = height - paddingTop - paddingBottom;
+
+  const maxValue = Math.max(
+    ...points.map(point => toNumber(point.value)),
+    ...points.map(point => toNumber(point.average)),
+    goal,
+    100
+  );
+
+  function getX(index) {
+    if (points.length <= 1) return paddingLeft;
+    return paddingLeft + (index / (points.length - 1)) * chartWidth;
+  }
+
+  function getY(value) {
+    return paddingTop + chartHeight - (toNumber(value) / maxValue) * chartHeight;
+  }
+
+  const gridLines = buildGridLines({
+    width,
+    paddingLeft,
+    paddingRight,
+    maxY: maxValue,
+    getY
+  });
+
+  const linePoints = points.map((point, index) => ({
+    x: getX(index),
+    y: getY(point.value)
+  }));
+
+  const path = pointsToPath(linePoints);
+
+  const dots = points.map((point, index) => {
+    const x = getX(index);
+    const y = getY(point.value);
+
+    return `
+      <circle class="chart-dot" cx="${x}" cy="${y}" r="5">
+        <title>${escapeHtml(point.title)}</title>
+      </circle>
+    `;
+  }).join("");
+
+  const xLabels = points.map((point, index) => {
+    if (!showAllLabels && !point.label) return "";
+
+    return `
+      <text class="chart-x-label" x="${getX(index)}" y="${height - 16}" text-anchor="middle">${point.label}</text>
+    `;
+  }).join("");
+
+  let averagePath = "";
+
+  if (showAverage) {
+    const averagePoints = points.map((point, index) => ({
+      x: getX(index),
+      y: getY(point.average)
+    }));
+
+    averagePath = `
+      <path class="chart-average-line" d="${pointsToPath(averagePoints)}"></path>
+    `;
+  }
+
+  const goalLine = buildGoalLine({
+    goal,
+    getY,
+    width,
+    paddingLeft,
+    paddingRight
+  });
+
+  container.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Kaloriendiagramm">
+      ${gridLines}
+      ${xLabels}
+      ${goalLine}
+      <path class="chart-calorie-line" d="${path}"></path>
+      ${averagePath}
+      ${dots}
+    </svg>
+  `;
+}
+
+function buildGridLines({
+  width,
+  paddingLeft,
+  paddingRight,
+  maxY,
+  getY
+}) {
+  const gridValues = [0, 0.25, 0.5, 0.75, 1].map(factor => round(maxY * factor, 0));
+
+  return gridValues.map(value => {
+    const y = getY(value);
+
+    return `
+      <line class="chart-grid-line" x1="${paddingLeft}" y1="${y}" x2="${width - paddingRight}" y2="${y}"></line>
+      <text class="chart-y-label" x="${paddingLeft - 10}" y="${y + 4}" text-anchor="end">${value}</text>
+    `;
+  }).join("");
+}
+
+function buildGoalLine({
+  goal,
+  getY,
+  width,
+  paddingLeft,
+  paddingRight
+}) {
+  if (!goal || goal <= 0) return "";
+
+  const goalY = getY(goal);
+
+  return `
+    <line class="chart-goal-line" x1="${paddingLeft}" y1="${goalY}" x2="${width - paddingRight}" y2="${goalY}"></line>
+    <text class="chart-goal-label" x="${width - paddingRight}" y="${goalY - 8}" text-anchor="end">Ziel ${goal} kcal</text>
+  `;
+}
+
+function pointsToPath(points) {
+  if (!points || points.length === 0) return "";
+
+  return points
+    .map((point, index) => {
+      return `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`;
+    })
+    .join(" ");
+}
+
+function formatShortDate(date) {
+  return date.toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "2-digit"
+  });
+}
+
+function changeDashboardDate(days) {
+  const currentDateString = getSelectedDashboardDateString();
+  const currentDate = parseDateInput(currentDateString);
+  const newDate = addDays(currentDate, days);
+
+  dashboardDateInput.value = toDateInput(newDate);
+  loadTodayMeals();
 }
 
 async function deleteMeal(id) {
@@ -974,6 +1361,15 @@ function formatTime(dateString) {
   });
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 searchFoodBtn.addEventListener("click", searchFoods);
 
 foodSearchInput.addEventListener("keydown", event => {
@@ -996,6 +1392,25 @@ amountInput.addEventListener("input", updateNutritionPreview);
 saveMealBtn.addEventListener("click", saveMeal);
 saveWeightBtn.addEventListener("click", saveWeight);
 saveProfileBtn.addEventListener("click", saveProfile);
+
+if (dashboardDateInput) {
+  dashboardDateInput.addEventListener("change", loadTodayMeals);
+}
+
+if (prevDayBtn) {
+  prevDayBtn.addEventListener("click", () => changeDashboardDate(-1));
+}
+
+if (todayBtn) {
+  todayBtn.addEventListener("click", () => {
+    dashboardDateInput.value = toDateInput(new Date());
+    loadTodayMeals();
+  });
+}
+
+if (nextDayBtn) {
+  nextDayBtn.addEventListener("click", () => changeDashboardDate(1));
+}
 
 async function initApp() {
   initDefaults();
