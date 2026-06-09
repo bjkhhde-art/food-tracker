@@ -44,6 +44,10 @@ const calorieProgress = document.getElementById("calorieProgress");
 const calorieGoalText = document.getElementById("calorieGoalText");
 const todayMeals = document.getElementById("todayMeals");
 
+const dailyCalorieChart = document.getElementById("dailyCalorieChart");
+const dailyChartTotal = document.getElementById("dailyChartTotal");
+const dailyChartInfo = document.getElementById("dailyChartInfo");
+
 const weightInput = document.getElementById("weightInput");
 const weightDateInput = document.getElementById("weightDateInput");
 const saveWeightBtn = document.getElementById("saveWeightBtn");
@@ -561,6 +565,7 @@ async function loadTodayMeals() {
 
   renderTodayMeals(data);
   updateTodaySummary(data);
+  renderDailyCalorieChart(data);
 }
 
 function renderTodayMeals(meals) {
@@ -623,6 +628,148 @@ function updateTodaySummary(meals) {
     calorieProgress.style.width = "0%";
     calorieGoalText.textContent = "Ziel: nicht gesetzt";
   }
+}
+
+function renderDailyCalorieChart(meals) {
+  if (!dailyCalorieChart) return;
+
+  const sortedMeals = (meals || [])
+    .slice()
+    .sort((a, b) => new Date(a.eaten_at) - new Date(b.eaten_at));
+
+  const totalCalories = sortedMeals.reduce((sum, meal) => {
+    return sum + toNumber(meal.calories);
+  }, 0);
+
+  dailyChartTotal.textContent = `${round(totalCalories, 0)} kcal`;
+
+  if (sortedMeals.length === 0) {
+    dailyChartInfo.textContent = "Noch keine Mahlzeiten heute.";
+    dailyCalorieChart.innerHTML = `
+      <div class="chart-empty">
+        Sobald du eine Mahlzeit speicherst, entsteht hier dein Tagesverlauf.
+      </div>
+    `;
+    return;
+  }
+
+  dailyChartInfo.textContent =
+    `${sortedMeals.length} Mahlzeit${sortedMeals.length === 1 ? "" : "en"} · ${formatTime(sortedMeals[0].eaten_at)} bis ${formatTime(sortedMeals[sortedMeals.length - 1].eaten_at)}`;
+
+  const goal = profile?.daily_calorie_goal ? toNumber(profile.daily_calorie_goal) : 0;
+  const maxY = Math.max(totalCalories, goal, 100);
+
+  const width = 760;
+  const height = 260;
+
+  const paddingLeft = 58;
+  const paddingRight = 24;
+  const paddingTop = 22;
+  const paddingBottom = 44;
+
+  const chartWidth = width - paddingLeft - paddingRight;
+  const chartHeight = height - paddingTop - paddingBottom;
+
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const endOfDay = new Date(startOfDay);
+  endOfDay.setDate(endOfDay.getDate() + 1);
+
+  function getX(dateValue) {
+    const date = new Date(dateValue);
+    const progress = (date - startOfDay) / (endOfDay - startOfDay);
+    const clampedProgress = Math.min(Math.max(progress, 0), 1);
+
+    return paddingLeft + clampedProgress * chartWidth;
+  }
+
+  function getY(kcal) {
+    return paddingTop + chartHeight - (kcal / maxY) * chartHeight;
+  }
+
+  const gridValues = [0, 0.25, 0.5, 0.75, 1].map(factor => round(maxY * factor, 0));
+
+  const gridLines = gridValues.map(value => {
+    const y = getY(value);
+
+    return `
+      <line class="chart-grid-line" x1="${paddingLeft}" y1="${y}" x2="${width - paddingRight}" y2="${y}"></line>
+      <text class="chart-y-label" x="${paddingLeft - 10}" y="${y + 4}" text-anchor="end">${value}</text>
+    `;
+  }).join("");
+
+  const xLabels = [
+    { label: "00:00", hour: 0 },
+    { label: "06:00", hour: 6 },
+    { label: "12:00", hour: 12 },
+    { label: "18:00", hour: 18 },
+    { label: "24:00", hour: 24 }
+  ].map(item => {
+    const date = new Date(startOfDay);
+    date.setHours(item.hour, 0, 0, 0);
+
+    const x = item.hour === 24 ? width - paddingRight : getX(date);
+
+    return `
+      <text class="chart-x-label" x="${x}" y="${height - 16}" text-anchor="middle">${item.label}</text>
+    `;
+  }).join("");
+
+  let runningCalories = 0;
+  let currentY = getY(0);
+  let path = `M ${paddingLeft} ${currentY}`;
+
+  const dots = sortedMeals.map(meal => {
+    const x = getX(meal.eaten_at);
+
+    runningCalories += toNumber(meal.calories);
+    const newY = getY(runningCalories);
+
+    path += ` L ${x} ${currentY} L ${x} ${newY}`;
+    currentY = newY;
+
+    return `
+      <circle class="chart-dot" cx="${x}" cy="${newY}" r="6">
+        <title>${escapeHtml(meal.food_name)} · ${round(meal.calories, 0)} kcal · Gesamt: ${round(runningCalories, 0)} kcal</title>
+      </circle>
+    `;
+  }).join("");
+
+  const lastMealTime = new Date(sortedMeals[sortedMeals.length - 1].eaten_at);
+  const now = new Date();
+  const lineEndDate = now > lastMealTime ? now : lastMealTime;
+  path += ` L ${getX(lineEndDate)} ${currentY}`;
+
+  let goalLine = "";
+
+  if (goal > 0) {
+    const goalY = getY(goal);
+
+    goalLine = `
+      <line class="chart-goal-line" x1="${paddingLeft}" y1="${goalY}" x2="${width - paddingRight}" y2="${goalY}"></line>
+      <text class="chart-goal-label" x="${width - paddingRight}" y="${goalY - 8}" text-anchor="end">Ziel ${goal} kcal</text>
+    `;
+  }
+
+  dailyCalorieChart.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Kalorienverlauf heute">
+      ${gridLines}
+      ${xLabels}
+      ${goalLine}
+      <path class="chart-calorie-line" d="${path}"></path>
+      ${dots}
+    </svg>
+  `;
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 async function deleteMeal(id) {
