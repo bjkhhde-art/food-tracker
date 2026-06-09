@@ -226,7 +226,45 @@ async function deleteSelectedFavorite() {
   favoriteSelect.value = "";
   await loadFavorites();
 }
+function normalizeSearchQuery(query) {
+  const replacements = {
+    joghurt: "yogurt",
+    yoghurt: "yogurt",
+    banane: "banana",
+    apfel: "apple",
+    milch: "milk",
+    käse: "cheese",
+    kaese: "cheese",
+    huhn: "chicken",
+    hähnchen: "chicken",
+    haehnchen: "chicken",
+    reis: "rice",
+    nudeln: "pasta",
+    kartoffel: "potato",
+    ei: "egg",
+    eier: "egg",
+    brot: "bread",
+    haferflocken: "oat"
+  };
 
+  return query
+    .toLowerCase()
+    .trim()
+    .replaceAll("ä", "ae")
+    .replaceAll("ö", "oe")
+    .replaceAll("ü", "ue")
+    .replaceAll("ß", "ss")
+    .split(/\s+/)
+    .map(word => replacements[word] || word)
+    .join(" ");
+}
+
+function getSearchTerms(query) {
+  return normalizeSearchQuery(query)
+    .split(/\s+/)
+    .map(term => term.trim())
+    .filter(term => term.length >= 2);
+}
 async function searchFoods() {
   const query = foodSearchInput.value.trim();
 
