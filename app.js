@@ -14,6 +14,32 @@ const BLS_COLUMNS = {
   fat: "FAT Fett [g/100g]"
 };
 
+const USER_COOKIE_NAME = "foodtracker_user_id";
+
+function getCookie(name) {
+  const cookies = document.cookie.split(";").map(cookie => cookie.trim());
+  const found = cookies.find(cookie => cookie.startsWith(`${name}=`));
+  return found ? decodeURIComponent(found.split("=")[1]) : null;
+}
+
+function setCookie(name, value, days = 3650) {
+  const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
+}
+
+function getOrCreateUserId() {
+  let userId = getCookie(USER_COOKIE_NAME);
+
+  if (!userId) {
+    userId = crypto.randomUUID();
+    setCookie(USER_COOKIE_NAME, userId);
+  }
+
+  return userId;
+}
+
+const currentUserId = getOrCreateUserId();
+
 const $ = id => document.getElementById(id);
 
 const headerDate = $("headerDate");
@@ -101,7 +127,6 @@ const openAddSheetBtn = $("openAddSheetBtn");
 const closeAddSheetBtn = $("closeAddSheetBtn");
 const addSheet = $("addSheet");
 const sheetOverlay = $("sheetOverlay");
-const navDashboardBtn = $("navDashboardBtn");
 const navAddBtn = $("navAddBtn");
 
 let selectedFood = null;
@@ -242,6 +267,7 @@ async function searchFoodsFromInput(value) {
   }
 
   let request = supabaseClient.from(FOOD_TABLE).select("*").limit(40);
+
   searchTerms.forEach(term => {
     request = request.ilike(BLS_COLUMNS.nameDe, `%${term}%`);
   });
@@ -324,6 +350,7 @@ async function saveMeal() {
   const eatenAt = eatenAtInput.value ? new Date(eatenAtInput.value).toISOString() : new Date().toISOString();
 
   const { error } = await supabaseClient.from("meal_logs").insert({
+    user_id: currentUserId,
     food_id: getFoodId(selectedFood),
     food_name: getFoodName(selectedFood),
     meal_category: mealCategoryInput.value,
@@ -357,6 +384,7 @@ async function loadFavorites() {
   const { data, error } = await supabaseClient
     .from("food_favorites")
     .select("*")
+    .eq("user_id", currentUserId)
     .order("food_name", { ascending: true });
 
   if (error) {
@@ -380,10 +408,8 @@ function renderFavoriteChips() {
   }
 
   top.forEach(fav => {
-    const chip1 = createFavoriteChip(fav);
-    const chip2 = createFavoriteChip(fav);
-    favoriteChips.appendChild(chip1);
-    sheetFavoriteChips.appendChild(chip2);
+    favoriteChips.appendChild(createFavoriteChip(fav));
+    sheetFavoriteChips.appendChild(createFavoriteChip(fav));
   });
 }
 
@@ -412,13 +438,14 @@ async function saveSelectedFoodAsFavorite() {
   const foodId = getFoodId(selectedFood);
 
   const { error } = await supabaseClient.from("food_favorites").upsert({
+    user_id: currentUserId,
     food_id: foodId,
     food_name: getFoodName(selectedFood),
     calories: n.calories,
     protein_g: n.protein,
     carbs_g: n.carbs,
     fat_g: n.fat
-  }, { onConflict: "food_id" });
+  }, { onConflict: "user_id,food_id" });
 
   if (error) {
     console.error(error);
@@ -481,6 +508,7 @@ async function loadDashboard() {
   const { data, error } = await supabaseClient
     .from("meal_logs")
     .select("*")
+    .eq("user_id", currentUserId)
     .gte("eaten_at", start.toISOString())
     .lt("eaten_at", end.toISOString())
     .order("eaten_at", { ascending: true });
@@ -578,9 +606,49 @@ function renderMeals(meals) {
 
 async function deleteMeal(id) {
   if (!confirm("Mahlzeit löschen?")) return;
-  const { error } = await supabaseClient.from("meal_logs").delete().eq("id", id);
+
+  const { error } = await supabaseClient
+    .from("meal_logs")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", currentUserId);
+
   if (error) return alert("Mahlzeit konnte nicht gelöscht werden.");
   await loadDashboard();
+}
+
+async function loadWeeklyAndTrendCharts(selectedDateString) {
+  const selectedDate = parseDateInput(selectedDateString);
+  const weekStart = getMonday(selectedDate);
+  const weekEnd = addDays(weekStart, 7);
+  const trendStart = addDays(selectedDate, -29);
+  trendStart.setHours(0, 0, 0, 0);
+  const trendEnd = addDays(selectedDate, 1);
+  trendEnd.setHours(0, 0, 0, 0);
+
+  const [weekly, trend] = await Promise.all([
+    supabaseClient.from("meal_logs").select("*").eq("user_id", currentUserId).gte("eaten_at", weekStart.toISOString()).lt("eaten_at", weekEnd.toISOString()),
+    supabaseClient.from("meal_logs").select("*").eq("user_id", currentUserId).gte("eaten_at", trendStart.toISOString()).lt("eaten_at", trendEnd.toISOString())
+  ]);
+
+  if (!weekly.error) renderWeeklyChart(weekly.data || [], weekStart);
+  if (!trend.error) renderTrendChart(trend.data || [], trendStart, 30);
+}
+
+function createDailyTotals(meals, startDate, days) {
+  const totals = [];
+  for (let i = 0; i < days; i++) {
+    const date = addDays(startDate, i);
+    totals.push({ date, key: toDateInput(date), calories: 0 });
+  }
+
+  meals.forEach(meal => {
+    const key = toDateInput(new Date(meal.eaten_at));
+    const entry = totals.find(item => item.key === key);
+    if (entry) entry.calories += toNumber(meal.calories);
+  });
+
+  return totals;
 }
 
 function renderDailyChart(meals, selectedDateString) {
@@ -630,40 +698,6 @@ function renderDailyChart(meals, selectedDateString) {
       ${dots}
     </svg>
   `;
-}
-
-async function loadWeeklyAndTrendCharts(selectedDateString) {
-  const selectedDate = parseDateInput(selectedDateString);
-  const weekStart = getMonday(selectedDate);
-  const weekEnd = addDays(weekStart, 7);
-  const trendStart = addDays(selectedDate, -29);
-  trendStart.setHours(0, 0, 0, 0);
-  const trendEnd = addDays(selectedDate, 1);
-  trendEnd.setHours(0, 0, 0, 0);
-
-  const [weekly, trend] = await Promise.all([
-    supabaseClient.from("meal_logs").select("*").gte("eaten_at", weekStart.toISOString()).lt("eaten_at", weekEnd.toISOString()),
-    supabaseClient.from("meal_logs").select("*").gte("eaten_at", trendStart.toISOString()).lt("eaten_at", trendEnd.toISOString())
-  ]);
-
-  if (!weekly.error) renderWeeklyChart(weekly.data || [], weekStart);
-  if (!trend.error) renderTrendChart(trend.data || [], trendStart, 30);
-}
-
-function createDailyTotals(meals, startDate, days) {
-  const totals = [];
-  for (let i = 0; i < days; i++) {
-    const date = addDays(startDate, i);
-    totals.push({ date, key: toDateInput(date), calories: 0 });
-  }
-
-  meals.forEach(meal => {
-    const key = toDateInput(new Date(meal.eaten_at));
-    const entry = totals.find(item => item.key === key);
-    if (entry) entry.calories += toNumber(meal.calories);
-  });
-
-  return totals;
 }
 
 function renderWeeklyChart(meals, weekStart) {
@@ -767,6 +801,7 @@ async function loadWeights() {
   const { data, error } = await supabaseClient
     .from("weight_logs")
     .select("*")
+    .eq("user_id", currentUserId)
     .order("logged_at", { ascending: false })
     .limit(10);
 
@@ -850,6 +885,7 @@ async function saveWeight() {
   if (!weightKg || !loggedAt) return alert("Bitte Gewicht und Datum eingeben.");
 
   const { error } = await supabaseClient.from("weight_logs").insert({
+    user_id: currentUserId,
     weight_kg: weightKg,
     logged_at: loggedAt
   });
@@ -863,7 +899,13 @@ async function saveWeight() {
 
 async function deleteWeight(id) {
   if (!confirm("Gewichtseintrag löschen?")) return;
-  const { error } = await supabaseClient.from("weight_logs").delete().eq("id", id);
+
+  const { error } = await supabaseClient
+    .from("weight_logs")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", currentUserId);
+
   if (error) return alert("Gewicht konnte nicht gelöscht werden.");
   await loadWeights();
 }
@@ -872,7 +914,7 @@ async function loadProfile() {
   const { data, error } = await supabaseClient
     .from("user_profile")
     .select("*")
-    .eq("id", 1)
+    .eq("user_id", currentUserId)
     .maybeSingle();
 
   if (error) {
@@ -895,7 +937,7 @@ async function loadProfile() {
 
 async function saveProfile() {
   const profileData = {
-    id: 1,
+    user_id: currentUserId,
     name: profileNameInput.value.trim(),
     age: profileAgeInput.value ? Number(profileAgeInput.value) : null,
     gender: profileGenderInput.value || null,
@@ -907,11 +949,14 @@ async function saveProfile() {
 
   const { data, error } = await supabaseClient
     .from("user_profile")
-    .upsert(profileData, { onConflict: "id" })
+    .upsert(profileData, { onConflict: "user_id" })
     .select()
     .single();
 
-  if (error) return alert("Profil konnte nicht gespeichert werden.");
+  if (error) {
+    console.error(error);
+    return alert("Profil konnte nicht gespeichert werden.");
+  }
 
   profile = data;
   alert("Profil gespeichert.");
