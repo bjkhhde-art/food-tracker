@@ -451,6 +451,40 @@ button {
   color: var(--muted);
 }
 
+.favorite-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.favorite-chip-name {
+  background: transparent;
+  color: var(--green-dark);
+  box-shadow: none;
+  padding: 10px 4px 10px 14px;
+  border-radius: 999px;
+}
+
+.favorite-chip-delete {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.14);
+  color: #b91c1c;
+  box-shadow: none;
+  padding: 0;
+  margin-right: 6px;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.favorite-chip-delete:hover {
+  background: #ef4444;
+  color: white;
+}
+
 .food-results {
   margin-top: 18px;
   display: flex;
@@ -459,11 +493,13 @@ button {
 }
 
 .food-result {
+  position: relative;
   background: rgba(255,255,255,0.78);
   border-radius: 20px;
-  padding: 15px;
+  padding: 15px 82px 15px 15px;
   cursor: pointer;
   border: 2px solid transparent;
+  min-height: 74px;
 }
 
 .food-result:hover {
@@ -478,6 +514,29 @@ button {
 .food-result small {
   color: var(--muted);
   line-height: 1.45;
+}
+
+.food-thumb {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 54px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 14px;
+  background: white;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.12);
+}
+
+.selected-food {
+  padding: 20px;
+  margin-top: 18px;
+  margin-bottom: 18px;
+}
+
+.selected-food h3 {
+  margin-top: 0;
 }
 
 .favorite-btn {
@@ -724,56 +783,4 @@ hr {
     width: 100%;
     text-align: center;
   }
-  .food-result {
-  position: relative;
-  padding-right: 82px;
 }
-
-.food-thumb {
-  position: absolute;
-  right: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 54px;
-  height: 54px;
-  object-fit: cover;
-  border-radius: 14px;
-  background: white;
-  box-shadow: 0 6px 14px rgba(0,0,0,0.12);
-}
-
-.favorite-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0;
-  overflow: hidden;
-}
-
-.favorite-chip-name {
-  background: transparent;
-  color: var(--green-dark);
-  box-shadow: none;
-  padding: 10px 4px 10px 14px;
-  border-radius: 999px;
-}
-
-.favorite-chip-delete {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: rgba(239, 68, 68, 0.14);
-  color: #b91c1c;
-  box-shadow: none;
-  padding: 0;
-  margin-right: 6px;
-  font-size: 18px;
-  line-height: 1;
-}
-
-.favorite-chip-delete:hover {
-  background: #ef4444;
-  color: white;
-}
-}
-
