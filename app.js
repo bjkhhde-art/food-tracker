@@ -131,10 +131,19 @@ const addSheet = $("addSheet");
 const sheetOverlay = $("sheetOverlay");
 const navAddBtn = $("navAddBtn");
 
+const scanBarcodeBtn = $("scanBarcodeBtn");
+const scannerOverlay = $("scannerOverlay");
+const closeScannerBtn = $("closeScannerBtn");
+const scannerReader = $("scannerReader");
+const scannerStatus = $("scannerStatus");
+
 let selectedFood = null;
 let profile = null;
 let favorites = [];
 let latestWeights = [];
+
+let html5QrCode = null;
+let isScannerRunning = false;
 
 function initDefaults() {
   const today = new Date();
@@ -332,10 +341,6 @@ function getSearchTerms(query) {
     .filter(term => term.length >= 2);
 }
 
-/* -------------------------------------------------------
-   OpenFoodFacts API + Supabase Cache
-------------------------------------------------------- */
-
 async function getOpenFoodProductByBarcode(barcode) {
   const cached = await getOpenFoodProductFromCacheByCode(barcode);
 
@@ -480,10 +485,6 @@ async function searchOpenFoodCache(query) {
 
   return (data || []).map(normalizeOpenFoodCacheProduct);
 }
-
-/* -------------------------------------------------------
-   Suche
-------------------------------------------------------- */
 
 async function searchBlsFoods(query) {
   const searchTerms = getSearchTerms(query);
@@ -825,6 +826,104 @@ async function deleteFavorite(foodId) {
   }
 
   await loadFavorites();
+}
+
+/* -------------------------------------------------------
+   Barcode Scanner
+------------------------------------------------------- */
+
+async function openScanner() {
+  scannerOverlay.classList.remove("hidden");
+  scannerStatus.textContent = "Kamera wird gestartet...";
+
+  await startBarcodeScanner();
+}
+
+async function startBarcodeScanner() {
+  try {
+    if (!window.Html5Qrcode) {
+      scannerStatus.textContent = "Scanner-Bibliothek konnte nicht geladen werden.";
+      return;
+    }
+
+    if (!html5QrCode) {
+      html5QrCode = new Html5Qrcode("scannerReader");
+    }
+
+    const scannerConfig = {
+      fps: 10,
+      qrbox: {
+        width: 280,
+        height: 170
+      },
+      aspectRatio: 1.777
+    };
+
+    if (window.Html5QrcodeSupportedFormats) {
+      scannerConfig.formatsToSupport = [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.QR_CODE
+      ];
+    }
+
+    await html5QrCode.start(
+      { facingMode: "environment" },
+      scannerConfig,
+      onScanSuccess,
+      () => {}
+    );
+
+    isScannerRunning = true;
+    scannerStatus.textContent = "Scanner läuft. Barcode bitte mittig ausrichten.";
+  } catch (error) {
+    console.error("Scanner Fehler:", error);
+    scannerStatus.textContent = "Kamera konnte nicht gestartet werden. Prüfe die Browser-Berechtigung.";
+  }
+}
+
+async function onScanSuccess(decodedText) {
+  const scannedValue = String(decodedText || "").trim();
+
+  if (!scannedValue) return;
+
+  scannerStatus.textContent = `Erkannt: ${scannedValue}`;
+
+  await closeScanner();
+
+  foodSearchInput.value = scannedValue;
+
+  if (isBarcode(scannedValue)) {
+    await searchFoodsFromInput(scannedValue);
+  } else {
+    foodResults.innerHTML = `<p>Code erkannt, aber kein gültiger Lebensmittel-Barcode: ${escapeHtml(scannedValue)}</p>`;
+    openAddSheet();
+  }
+}
+
+async function stopBarcodeScanner() {
+  try {
+    if (html5QrCode && isScannerRunning) {
+      await html5QrCode.stop();
+      isScannerRunning = false;
+    }
+
+    if (html5QrCode) {
+      await html5QrCode.clear();
+    }
+  } catch (error) {
+    console.warn("Scanner konnte nicht sauber gestoppt werden:", error);
+  }
+}
+
+async function closeScanner() {
+  await stopBarcodeScanner();
+  scannerOverlay.classList.add("hidden");
+  scannerStatus.textContent = "Scanner wird vorbereitet...";
 }
 
 function getSelectedDateString() {
@@ -1487,6 +1586,15 @@ weightWidget.addEventListener("click", openProfileDrawer);
 sheetOverlay.addEventListener("click", () => {
   closeAddSheet();
   closeProfileDrawer();
+});
+
+scanBarcodeBtn.addEventListener("click", openScanner);
+closeScannerBtn.addEventListener("click", closeScanner);
+
+scannerOverlay.addEventListener("click", event => {
+  if (event.target === scannerOverlay) {
+    closeScanner();
+  }
 });
 
 async function initApp() {
