@@ -3,6 +3,7 @@ const SUPABASE_KEY = "sb_publishable_uunR3UQ9rttiK8dG85IedQ__Tn1duVK";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const FOOD_TABLE = "bls_foods";
+const OPENFOOD_API_BASE = "https://world.openfoodfacts.org";
 
 const BLS_COLUMNS = {
   id: "BLS Code",
@@ -140,6 +141,14 @@ function initDefaults() {
   weightDateInput.value = toDateInput(today);
   dashboardDateInput.value = toDateInput(today);
   updateHeaderDate();
+
+  if (foodSearchInput) {
+    foodSearchInput.placeholder = "BLS suchen oder Barcode eingeben, z. B. Brot oder 4008400402222";
+  }
+
+  if (inlineFoodSearchInput) {
+    inlineFoodSearchInput.placeholder = "Lebensmittel oder Barcode suchen";
+  }
 }
 
 function toLocalDateTimeInput(date) {
@@ -168,6 +177,10 @@ function round(value, decimals = 1) {
   return Math.round(value * Math.pow(10, decimals)) / Math.pow(10, decimals);
 }
 
+function isBarcode(value) {
+  return /^\d{8,14}$/.test(String(value).trim());
+}
+
 function getValue(food, names) {
   for (const name of names) {
     if (food[name] !== undefined && food[name] !== null && food[name] !== "") return food[name];
@@ -176,10 +189,21 @@ function getValue(food, names) {
 }
 
 function getFoodId(food) {
-  return String(getValue(food, [BLS_COLUMNS.id, "bls_code", "BLS_Code", "id"])).trim();
+  if (food.source === "openfood") return `openfood:${food.code}`;
+  if (food.source === "favorite") return String(food.food_id || "").trim();
+  return `bls:${String(getValue(food, [BLS_COLUMNS.id, "bls_code", "BLS_Code", "id"])).trim()}`;
 }
 
 function getFoodName(food) {
+  if (food.source === "openfood") {
+    const brand = food.brands ? ` · ${food.brands}` : "";
+    return `${food.product_name || "OpenFood Produkt"}${brand}`;
+  }
+
+  if (food.source === "favorite") {
+    return food.food_name || "Favorit";
+  }
+
   return String(getValue(food, [
     BLS_COLUMNS.nameDe,
     "lebensmittelbezeichnung",
@@ -192,6 +216,24 @@ function getFoodName(food) {
 }
 
 function getFoodNutritionPer100g(food) {
+  if (food.source === "openfood") {
+    return {
+      calories: toNumber(food.calories),
+      protein: toNumber(food.protein),
+      carbs: toNumber(food.carbs),
+      fat: toNumber(food.fat)
+    };
+  }
+
+  if (food.source === "favorite") {
+    return {
+      calories: toNumber(food.calories),
+      protein: toNumber(food.protein_g),
+      carbs: toNumber(food.carbs_g),
+      fat: toNumber(food.fat_g)
+    };
+  }
+
   return {
     calories: toNumber(getValue(food, [BLS_COLUMNS.calories, "ENERCC", "energy_kcal", "calories", "Calories"])),
     protein: toNumber(getValue(food, [BLS_COLUMNS.protein, "PROT625", "protein_g", "Protein"])),
@@ -203,6 +245,7 @@ function getFoodNutritionPer100g(food) {
 function calculateNutritionForAmount(food, amountG) {
   const per100g = getFoodNutritionPer100g(food);
   const factor = amountG / 100;
+
   return {
     calories: round(per100g.calories * factor, 0),
     protein: round(per100g.protein * factor, 1),
@@ -249,24 +292,69 @@ function getSearchTerms(query) {
     .filter(term => term.length >= 2);
 }
 
-async function searchFoodsFromInput(value) {
-  const query = value.trim();
-  if (!query) {
-    alert("Bitte Lebensmittel eingeben.");
-    return;
-  }
+async function getOpenFoodProductByBarcode(barcode) {
+  const fields = [
+    "code",
+    "product_name",
+    "brands",
+    "quantity",
+    "image_url",
+    "nutriments"
+  ].join(",");
 
-  openAddSheet();
-  foodSearchInput.value = query;
-  foodResults.innerHTML = "<p>Suche läuft...</p>";
+  const url = `${OPENFOOD_API_BASE}/api/v2/product/${encodeURIComponent(barcode)}.json?fields=${fields}`;
 
+  const response = await fetch(url);
+  const data = await response.json();
+
+  if (!data || data.status !== 1 || !data.product) return null;
+
+  return normalizeOpenFoodProduct(data.product);
+}
+
+async function searchOpenFoodProducts(query) {
+  const params = new URLSearchParams({
+    search_terms: query,
+    page_size: "20",
+    fields: "code,product_name,brands,quantity,image_url,nutriments"
+  });
+
+  const url = `${OPENFOOD_API_BASE}/cgi/search.pl?${params.toString()}&json=1`;
+
+  const response = await fetch(url);
+  const data = await response.json();
+
+  return (data.products || [])
+    .map(normalizeOpenFoodProduct)
+    .filter(product => product.product_name && product.calories > 0);
+}
+
+function normalizeOpenFoodProduct(product) {
+  const n = product.nutriments || {};
+
+  return {
+    source: "openfood",
+    code: product.code || "",
+    product_name: product.product_name || "Unbekanntes Produkt",
+    brands: product.brands || "",
+    quantity: product.quantity || "",
+    image_url: product.image_url || "",
+    calories: toNumber(n["energy-kcal_100g"]),
+    protein: toNumber(n["proteins_100g"]),
+    carbs: toNumber(n["carbohydrates_100g"]),
+    fat: toNumber(n["fat_100g"])
+  };
+}
+
+async function searchBlsFoods(query) {
   const searchTerms = getSearchTerms(query);
-  if (searchTerms.length === 0) {
-    foodResults.innerHTML = "<p>Bitte mindestens 2 Zeichen eingeben.</p>";
-    return;
-  }
 
-  let request = supabaseClient.from(FOOD_TABLE).select("*").limit(40);
+  if (searchTerms.length === 0) return [];
+
+  let request = supabaseClient
+    .from(FOOD_TABLE)
+    .select("*")
+    .limit(40);
 
   searchTerms.forEach(term => {
     request = request.ilike(BLS_COLUMNS.nameDe, `%${term}%`);
@@ -275,12 +363,51 @@ async function searchFoodsFromInput(value) {
   const { data, error } = await request;
 
   if (error) {
-    console.error(error);
-    foodResults.innerHTML = "<p>Suche hat nicht geklappt.</p>";
+    console.error("BLS-Suche Fehler:", error);
+    return [];
+  }
+
+  return sortFoodResults(data || [], searchTerms);
+}
+
+async function searchFoodsFromInput(value) {
+  const query = value.trim();
+
+  if (!query) {
+    alert("Bitte Lebensmittel oder Barcode eingeben.");
     return;
   }
 
-  renderFoodResults(sortFoodResults(data, searchTerms));
+  openAddSheet();
+  foodSearchInput.value = query;
+  foodResults.innerHTML = "<p>Suche läuft...</p>";
+
+  try {
+    if (isBarcode(query)) {
+      const product = await getOpenFoodProductByBarcode(query);
+
+      if (!product) {
+        foodResults.innerHTML = "<p>Kein Produkt mit diesem Barcode gefunden.</p>";
+        return;
+      }
+
+      renderFoodResults([product]);
+      return;
+    }
+
+    const [blsResults, openFoodResults] = await Promise.all([
+      searchBlsFoods(query),
+      searchOpenFoodProducts(query)
+    ]);
+
+    renderFoodResults([
+      ...blsResults,
+      ...openFoodResults
+    ]);
+  } catch (error) {
+    console.error("Fehler bei der Suche:", error);
+    foodResults.innerHTML = "<p>Suche hat nicht geklappt.</p>";
+  }
 }
 
 function sortFoodResults(foods, terms) {
@@ -313,10 +440,21 @@ function renderFoodResults(foods) {
     const nutrition = getFoodNutritionPer100g(food);
     const div = document.createElement("div");
     div.className = "food-result";
+
+    const sourceLabel = food.source === "openfood" ? "OpenFoodFacts" : "BLS";
+    const sourceBadge = food.source === "openfood" ? "🛒 Markenprodukt" : "🇩🇪 BLS";
+
     div.innerHTML = `
-      <strong>${getFoodName(food)}</strong>
-      <small>${nutrition.calories} kcal · Protein ${nutrition.protein} g · KH ${nutrition.carbs} g · Fett ${nutrition.fat} g pro 100 g</small>
+      <strong>${escapeHtml(getFoodName(food))}</strong>
+      <small>
+        ${sourceBadge} · ${nutrition.calories} kcal · 
+        Protein ${nutrition.protein} g · 
+        KH ${nutrition.carbs} g · 
+        Fett ${nutrition.fat} g pro 100 g
+      </small>
+      ${food.source === "openfood" && food.image_url ? `<img class="food-thumb" src="${food.image_url}" alt="${escapeHtml(getFoodName(food))}">` : ""}
     `;
+
     div.addEventListener("click", () => selectFood(food));
     foodResults.appendChild(div);
   });
@@ -331,6 +469,7 @@ function selectFood(food) {
 
 function updateNutritionPreview() {
   if (!selectedFood) return;
+
   const amountG = toNumber(amountInput.value) || 100;
   const n = calculateNutritionForAmount(selectedFood, amountG);
 
@@ -417,17 +556,20 @@ function createFavoriteChip(fav) {
   const btn = document.createElement("button");
   btn.className = "food-chip";
   btn.textContent = fav.food_name;
+
   btn.addEventListener("click", () => {
     openAddSheet();
     selectFood({
-      [BLS_COLUMNS.id]: fav.food_id,
-      [BLS_COLUMNS.nameDe]: fav.food_name,
-      [BLS_COLUMNS.calories]: fav.calories,
-      [BLS_COLUMNS.protein]: fav.protein_g,
-      [BLS_COLUMNS.carbs]: fav.carbs_g,
-      [BLS_COLUMNS.fat]: fav.fat_g
+      source: "favorite",
+      food_id: fav.food_id,
+      food_name: fav.food_name,
+      calories: fav.calories,
+      protein_g: fav.protein_g,
+      carbs_g: fav.carbs_g,
+      fat_g: fav.fat_g
     });
   });
+
   return btn;
 }
 
@@ -464,8 +606,10 @@ function getSelectedDateString() {
 function getDayRange(dateString) {
   const start = parseDateInput(dateString);
   start.setHours(0, 0, 0, 0);
+
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
+
   return { start, end };
 }
 
@@ -490,7 +634,13 @@ function isSameLocalDay(a, b) {
 function formatDashboardDate(dateString) {
   const date = parseDateInput(dateString);
   if (isSameLocalDay(date, new Date())) return "Heute";
-  return date.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
+
+  return date.toLocaleDateString("de-DE", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  });
 }
 
 function updateHeaderDate() {
@@ -544,7 +694,10 @@ function updateSummary(meals) {
   todayFat.textContent = `${round(totals.fat, 1)} g`;
 
   calorieGoalText.textContent = goal > 0 ? `von ${goal} kcal` : "Ziel nicht gesetzt";
-  calorieLeftText.textContent = goal > 0 ? `${Math.abs(round(left, 0))} kcal ${left >= 0 ? "frei" : "drüber"}` : `${round(totals.calories, 0)} kcal`;
+  calorieLeftText.textContent = goal > 0
+    ? `${Math.abs(round(left, 0))} kcal ${left >= 0 ? "frei" : "drüber"}`
+    : `${round(totals.calories, 0)} kcal`;
+
   dailyStatusText.textContent = goal > 0
     ? left >= 0 ? "Du bist noch im Zielbereich." : "Du bist über deinem Tagesziel."
     : "Setze ein Kalorienziel im Profil.";
@@ -593,7 +746,7 @@ function renderMeals(meals) {
       div.className = "meal-item";
       div.innerHTML = `
         <div>
-          <strong>${meal.food_name}</strong>
+          <strong>${escapeHtml(meal.food_name)}</strong>
           <div class="meal-meta">${meal.amount_g} g · ${meal.calories} kcal · ${formatTime(meal.eaten_at)}</div>
         </div>
         <button class="delete-btn">×</button>
@@ -619,10 +772,13 @@ async function deleteMeal(id) {
 
 async function loadWeeklyAndTrendCharts(selectedDateString) {
   const selectedDate = parseDateInput(selectedDateString);
+
   const weekStart = getMonday(selectedDate);
   const weekEnd = addDays(weekStart, 7);
+
   const trendStart = addDays(selectedDate, -29);
   trendStart.setHours(0, 0, 0, 0);
+
   const trendEnd = addDays(selectedDate, 1);
   trendEnd.setHours(0, 0, 0, 0);
 
@@ -637,6 +793,7 @@ async function loadWeeklyAndTrendCharts(selectedDateString) {
 
 function createDailyTotals(meals, startDate, days) {
   const totals = [];
+
   for (let i = 0; i < days; i++) {
     const date = addDays(startDate, i);
     totals.push({ date, key: toDateInput(date), calories: 0 });
@@ -654,6 +811,7 @@ function createDailyTotals(meals, startDate, days) {
 function renderDailyChart(meals, selectedDateString) {
   const sorted = meals.slice().sort((a, b) => new Date(a.eaten_at) - new Date(b.eaten_at));
   const total = sorted.reduce((s, m) => s + toNumber(m.calories), 0);
+
   dailyChartTotal.textContent = `${round(total, 0)} kcal`;
 
   if (sorted.length === 0) {
@@ -731,6 +889,7 @@ function renderTrendChart(meals, startDate, count) {
 
 function renderLineChart(container, points, showAllLabels) {
   const hasData = points.some(p => p.value > 0);
+
   if (!hasData) {
     container.innerHTML = `<div class="chart-empty">Noch keine Daten vorhanden.</div>`;
     return;
@@ -772,8 +931,11 @@ function buildGrid(width, left, right, maxY, getY) {
   return [0, .25, .5, .75, 1].map(f => {
     const value = round(maxY * f, 0);
     const y = getY(value);
-    return `<line class="chart-grid-line" x1="${left}" y1="${y}" x2="${width - right}" y2="${y}"></line>
-            <text class="chart-y-label" x="${left - 8}" y="${y + 4}" text-anchor="end">${value}</text>`;
+
+    return `
+      <line class="chart-grid-line" x1="${left}" y1="${y}" x2="${width - right}" y2="${y}"></line>
+      <text class="chart-y-label" x="${left - 8}" y="${y + 4}" text-anchor="end">${value}</text>
+    `;
   }).join("");
 }
 
@@ -782,15 +944,20 @@ function buildTimeLabels(width, height, left, right, start, getX) {
     const date = new Date(start);
     date.setHours(hour, 0, 0, 0);
     const x = hour === 24 ? width - right : getX(date);
+
     return `<text class="chart-x-label" x="${x}" y="${height - 16}" text-anchor="middle">${String(hour).padStart(2, "0")}:00</text>`;
   }).join("");
 }
 
 function buildGoal(goal, getY, width, left, right) {
   if (!goal || goal <= 0) return "";
+
   const y = getY(goal);
-  return `<line class="chart-goal-line" x1="${left}" y1="${y}" x2="${width - right}" y2="${y}"></line>
-          <text class="chart-goal-label" x="${width - right}" y="${y - 8}" text-anchor="end">Ziel ${goal}</text>`;
+
+  return `
+    <line class="chart-goal-line" x1="${left}" y1="${y}" x2="${width - right}" y2="${y}"></line>
+    <text class="chart-goal-label" x="${width - right}" y="${y - 8}" text-anchor="end">Ziel ${goal}</text>
+  `;
 }
 
 function pointsToPath(points) {
@@ -849,6 +1016,7 @@ function renderWeightWidget() {
 
 function renderWeights(weights) {
   weightList.innerHTML = "";
+
   if (weights.length === 0) {
     weightList.innerHTML = "<p>Noch keine Gewichtseinträge.</p>";
     return;
@@ -1012,9 +1180,11 @@ function escapeHtml(value) {
 }
 
 searchFoodBtn.addEventListener("click", () => searchFoodsFromInput(foodSearchInput.value));
+
 foodSearchInput.addEventListener("keydown", e => {
   if (e.key === "Enter") searchFoodsFromInput(foodSearchInput.value);
 });
+
 inlineFoodSearchInput.addEventListener("keydown", e => {
   if (e.key === "Enter") searchFoodsFromInput(inlineFoodSearchInput.value);
 });
@@ -1027,8 +1197,10 @@ saveWeightBtn.addEventListener("click", saveWeight);
 saveProfileBtn.addEventListener("click", saveProfile);
 
 dashboardDateInput.addEventListener("change", loadDashboard);
+
 prevDayBtn.addEventListener("click", () => changeDashboardDate(-1));
 nextDayBtn.addEventListener("click", () => changeDashboardDate(1));
+
 todayBtn.addEventListener("click", () => {
   dashboardDateInput.value = toDateInput(new Date());
   loadDashboard();
