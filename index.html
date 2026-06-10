@@ -167,10 +167,12 @@
       <div id="sheetFavoriteChips" class="chip-row scrollable-favorites sheet-favorites"></div>
     </div>
 
+    <button id="scanBarcodeBtn" class="scanner-btn">📷 Barcode scannen</button>
+
     <div class="form-grid">
       <div>
         <label>Lebensmittel suchen</label>
-        <input id="foodSearchInput" type="text" placeholder="z. B. Brot, Joghurt, Reis">
+        <input id="foodSearchInput" type="text" placeholder="z. B. Brot, Joghurt, Reis oder Barcode">
       </div>
       <button id="searchFoodBtn">Suchen</button>
     </div>
@@ -299,7 +301,23 @@
     <div id="weightList" class="weight-list"></div>
   </aside>
 
+  <div id="scannerOverlay" class="scanner-overlay hidden">
+    <div class="scanner-card">
+      <div class="scanner-header">
+        <div>
+          <h2>Barcode scannen</h2>
+          <p>Halte den Barcode mittig vor die Kamera.</p>
+        </div>
+        <button id="closeScannerBtn" class="icon-btn">×</button>
+      </div>
+
+      <div id="scannerReader" class="scanner-reader"></div>
+      <p id="scannerStatus" class="scanner-status">Scanner wird vorbereitet...</p>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
   <script src="app.js"></script>
 </body>
 </html>
