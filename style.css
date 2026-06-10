@@ -724,4 +724,56 @@ hr {
     width: 100%;
     text-align: center;
   }
+  .food-result {
+  position: relative;
+  padding-right: 82px;
 }
+
+.food-thumb {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 54px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 14px;
+  background: white;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.12);
+}
+
+.favorite-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.favorite-chip-name {
+  background: transparent;
+  color: var(--green-dark);
+  box-shadow: none;
+  padding: 10px 4px 10px 14px;
+  border-radius: 999px;
+}
+
+.favorite-chip-delete {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.14);
+  color: #b91c1c;
+  box-shadow: none;
+  padding: 0;
+  margin-right: 6px;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.favorite-chip-delete:hover {
+  background: #ef4444;
+  color: white;
+}
+}
+
