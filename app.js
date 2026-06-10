@@ -1,6 +1,5 @@
 const SUPABASE_URL = "https://lrzgcqoqcwicpuuuhaoj.supabase.co";
 const SUPABASE_KEY = "sb_publishable_uunR3UQ9rttiK8dG85IedQ__Tn1duVK";
-
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const FOOD_TABLE = "bls_foods";
@@ -15,81 +14,107 @@ const BLS_COLUMNS = {
   fat: "FAT Fett [g/100g]"
 };
 
-const foodSearchInput = document.getElementById("foodSearchInput");
-const searchFoodBtn = document.getElementById("searchFoodBtn");
-const foodResults = document.getElementById("foodResults");
+const $ = id => document.getElementById(id);
 
-const favoriteSelect = document.getElementById("favoriteSelect");
-const loadFavoriteBtn = document.getElementById("loadFavoriteBtn");
-const deleteFavoriteBtn = document.getElementById("deleteFavoriteBtn");
-const saveFavoriteBtn = document.getElementById("saveFavoriteBtn");
+const headerDate = $("headerDate");
+const openProfileBtn = $("openProfileBtn");
+const closeProfileBtn = $("closeProfileBtn");
+const profileDrawer = $("profileDrawer");
 
-const selectedFoodBox = document.getElementById("selectedFoodBox");
-const selectedFoodName = document.getElementById("selectedFoodName");
-const amountInput = document.getElementById("amountInput");
-const mealCategoryInput = document.getElementById("mealCategoryInput");
-const eatenAtInput = document.getElementById("eatenAtInput");
-const saveMealBtn = document.getElementById("saveMealBtn");
+const dashboardDateInput = $("dashboardDateInput");
+const prevDayBtn = $("prevDayBtn");
+const todayBtn = $("todayBtn");
+const nextDayBtn = $("nextDayBtn");
 
-const previewCalories = document.getElementById("previewCalories");
-const previewProtein = document.getElementById("previewProtein");
-const previewCarbs = document.getElementById("previewCarbs");
-const previewFat = document.getElementById("previewFat");
+const foodSearchInput = $("foodSearchInput");
+const inlineFoodSearchInput = $("inlineFoodSearchInput");
+const searchFoodBtn = $("searchFoodBtn");
+const foodResults = $("foodResults");
+const favoriteChips = $("favoriteChips");
+const sheetFavoriteChips = $("sheetFavoriteChips");
 
-const todayCalories = document.getElementById("todayCalories");
-const todayProtein = document.getElementById("todayProtein");
-const todayCarbs = document.getElementById("todayCarbs");
-const todayFat = document.getElementById("todayFat");
-const calorieProgress = document.getElementById("calorieProgress");
-const calorieGoalText = document.getElementById("calorieGoalText");
-const todayMeals = document.getElementById("todayMeals");
+const selectedFoodBox = $("selectedFoodBox");
+const selectedFoodName = $("selectedFoodName");
+const amountInput = $("amountInput");
+const mealCategoryInput = $("mealCategoryInput");
+const eatenAtInput = $("eatenAtInput");
+const saveMealBtn = $("saveMealBtn");
+const saveFavoriteBtn = $("saveFavoriteBtn");
 
-const dashboardDateInput = document.getElementById("dashboardDateInput");
-const prevDayBtn = document.getElementById("prevDayBtn");
-const todayBtn = document.getElementById("todayBtn");
-const nextDayBtn = document.getElementById("nextDayBtn");
-const dayMealsTitle = document.getElementById("dayMealsTitle");
+const previewCalories = $("previewCalories");
+const previewProtein = $("previewProtein");
+const previewCarbs = $("previewCarbs");
+const previewFat = $("previewFat");
 
-const dailyCalorieChart = document.getElementById("dailyCalorieChart");
-const dailyChartTotal = document.getElementById("dailyChartTotal");
-const dailyChartInfo = document.getElementById("dailyChartInfo");
+const todayCalories = $("todayCalories");
+const todayProtein = $("todayProtein");
+const todayCarbs = $("todayCarbs");
+const todayFat = $("todayFat");
+const calorieGoalText = $("calorieGoalText");
+const calorieLeftText = $("calorieLeftText");
+const dailyStatusText = $("dailyStatusText");
+const calorieDonut = $("calorieDonut");
 
-const weeklyCalorieChart = document.getElementById("weeklyCalorieChart");
-const weeklyChartTotal = document.getElementById("weeklyChartTotal");
-const weeklyChartInfo = document.getElementById("weeklyChartInfo");
+const proteinProgress = $("proteinProgress");
+const carbsProgress = $("carbsProgress");
+const fatProgress = $("fatProgress");
+const proteinPercent = $("proteinPercent");
+const carbsPercent = $("carbsPercent");
+const fatPercent = $("fatPercent");
 
-const trendCalorieChart = document.getElementById("trendCalorieChart");
-const trendChartAverage = document.getElementById("trendChartAverage");
-const trendChartInfo = document.getElementById("trendChartInfo");
+const currentWeightText = $("currentWeightText");
+const weightGoalText = $("weightGoalText");
+const weightDiffText = $("weightDiffText");
+const weightTrendText = $("weightTrendText");
+const weightWidget = $("weightWidget");
 
-const weightInput = document.getElementById("weightInput");
-const weightDateInput = document.getElementById("weightDateInput");
-const saveWeightBtn = document.getElementById("saveWeightBtn");
-const weightSummary = document.getElementById("weightSummary");
-const weightList = document.getElementById("weightList");
+const dailyCalorieChart = $("dailyCalorieChart");
+const dailyChartTotal = $("dailyChartTotal");
+const dailyChartInfo = $("dailyChartInfo");
+const weeklyCalorieChart = $("weeklyCalorieChart");
+const weeklyChartTotal = $("weeklyChartTotal");
+const weeklyChartInfo = $("weeklyChartInfo");
+const trendCalorieChart = $("trendCalorieChart");
+const trendChartAverage = $("trendChartAverage");
+const trendChartInfo = $("trendChartInfo");
 
-const profileNameInput = document.getElementById("profileNameInput");
-const profileAgeInput = document.getElementById("profileAgeInput");
-const profileGenderInput = document.getElementById("profileGenderInput");
-const profileHeightInput = document.getElementById("profileHeightInput");
-const profileActivityInput = document.getElementById("profileActivityInput");
-const targetWeightInput = document.getElementById("targetWeightInput");
-const dailyCalorieGoalInput = document.getElementById("dailyCalorieGoalInput");
-const saveProfileBtn = document.getElementById("saveProfileBtn");
+const todayMeals = $("todayMeals");
+const dayMealsTitle = $("dayMealsTitle");
+
+const weightInput = $("weightInput");
+const weightDateInput = $("weightDateInput");
+const saveWeightBtn = $("saveWeightBtn");
+const weightSummary = $("weightSummary");
+const weightList = $("weightList");
+
+const profileNameInput = $("profileNameInput");
+const profileAgeInput = $("profileAgeInput");
+const profileGenderInput = $("profileGenderInput");
+const profileHeightInput = $("profileHeightInput");
+const profileActivityInput = $("profileActivityInput");
+const targetWeightInput = $("targetWeightInput");
+const dailyCalorieGoalInput = $("dailyCalorieGoalInput");
+const saveProfileBtn = $("saveProfileBtn");
+
+const fabBtn = $("fabBtn");
+const openAddSheetBtn = $("openAddSheetBtn");
+const closeAddSheetBtn = $("closeAddSheetBtn");
+const addSheet = $("addSheet");
+const sheetOverlay = $("sheetOverlay");
+const navDashboardBtn = $("navDashboardBtn");
+const navAddBtn = $("navAddBtn");
 
 let selectedFood = null;
 let profile = null;
 let favorites = [];
+let latestWeights = [];
 
 function initDefaults() {
   const today = new Date();
-
   eatenAtInput.value = toLocalDateTimeInput(today);
   weightDateInput.value = toDateInput(today);
-
-  if (dashboardDateInput) {
-    dashboardDateInput.value = toDateInput(today);
-  }
+  dashboardDateInput.value = toDateInput(today);
+  updateHeaderDate();
 }
 
 function toLocalDateTimeInput(date) {
@@ -102,20 +127,15 @@ function toDateInput(date) {
   return new Date(date.getTime() - offsetMs).toISOString().slice(0, 10);
 }
 
+function parseDateInput(dateString) {
+  const [year, month, day] = dateString.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
 function toNumber(value) {
   if (value === null || value === undefined || value === "") return 0;
-
   const text = String(value).trim();
-
-  if (
-    text === "-" ||
-    text.toUpperCase() === "TR" ||
-    text.toUpperCase() === "NA" ||
-    text.startsWith("<")
-  ) {
-    return 0;
-  }
-
+  if (text === "-" || text.toUpperCase() === "TR" || text.toUpperCase() === "NA" || text.startsWith("<")) return 0;
   return Number(text.replace(",", ".")) || 0;
 }
 
@@ -123,83 +143,41 @@ function round(value, decimals = 1) {
   return Math.round(value * Math.pow(10, decimals)) / Math.pow(10, decimals);
 }
 
-function getValue(food, possibleNames) {
-  for (const name of possibleNames) {
-    if (food[name] !== undefined && food[name] !== null && food[name] !== "") {
-      return food[name];
-    }
+function getValue(food, names) {
+  for (const name of names) {
+    if (food[name] !== undefined && food[name] !== null && food[name] !== "") return food[name];
   }
-
   return 0;
 }
 
 function getFoodId(food) {
-  return String(
-    getValue(food, [
-      BLS_COLUMNS.id,
-      "bls_code",
-      "BLS_Code",
-      "id"
-    ])
-  ).trim();
+  return String(getValue(food, [BLS_COLUMNS.id, "bls_code", "BLS_Code", "id"])).trim();
 }
 
 function getFoodName(food) {
-  return String(
-    getValue(food, [
-      BLS_COLUMNS.nameDe,
-      "lebensmittelbezeichnung",
-      "Lebensmittel",
-      "food_name_de",
-      BLS_COLUMNS.nameEn,
-      "food_name",
-      "Food_Name"
-    ])
-  ).trim() || "Unbekanntes Lebensmittel";
+  return String(getValue(food, [
+    BLS_COLUMNS.nameDe,
+    "lebensmittelbezeichnung",
+    "Lebensmittel",
+    "food_name_de",
+    BLS_COLUMNS.nameEn,
+    "food_name",
+    "Food_Name"
+  ])).trim() || "Unbekanntes Lebensmittel";
 }
 
 function getFoodNutritionPer100g(food) {
   return {
-    calories: toNumber(
-      getValue(food, [
-        BLS_COLUMNS.calories,
-        "ENERCC",
-        "energy_kcal",
-        "calories",
-        "Calories"
-      ])
-    ),
-    protein: toNumber(
-      getValue(food, [
-        BLS_COLUMNS.protein,
-        "PROT625",
-        "protein_g",
-        "Protein"
-      ])
-    ),
-    carbs: toNumber(
-      getValue(food, [
-        BLS_COLUMNS.carbs,
-        "CHO",
-        "carbs_g",
-        "Carbs"
-      ])
-    ),
-    fat: toNumber(
-      getValue(food, [
-        BLS_COLUMNS.fat,
-        "FAT",
-        "fat_g",
-        "Fat"
-      ])
-    )
+    calories: toNumber(getValue(food, [BLS_COLUMNS.calories, "ENERCC", "energy_kcal", "calories", "Calories"])),
+    protein: toNumber(getValue(food, [BLS_COLUMNS.protein, "PROT625", "protein_g", "Protein"])),
+    carbs: toNumber(getValue(food, [BLS_COLUMNS.carbs, "CHO", "carbs_g", "Carbs"])),
+    fat: toNumber(getValue(food, [BLS_COLUMNS.fat, "FAT", "fat_g", "Fat"]))
   };
 }
 
 function calculateNutritionForAmount(food, amountG) {
   const per100g = getFoodNutritionPer100g(food);
   const factor = amountG / 100;
-
   return {
     calories: round(per100g.calories * factor, 0),
     protein: round(per100g.protein * factor, 1),
@@ -210,55 +188,23 @@ function calculateNutritionForAmount(food, amountG) {
 
 function normalizeSearchQuery(query) {
   const replacements = {
-    yoghurt: "joghurt",
-    yogurt: "joghurt",
-
-    bananen: "banane",
-    banana: "banane",
-
-    aepfel: "apfel",
-    äpfel: "apfel",
-    apple: "apfel",
-
-    haehnchen: "hähnchen",
-    huhn: "hähnchen",
-    chicken: "hähnchen",
-
-    kaese: "käse",
-    cheese: "käse",
-
-    beef: "rind",
-    rindfleisch: "rind",
-
-    pork: "schwein",
-    schweinefleisch: "schwein",
-
-    rice: "reis",
-    pasta: "nudeln",
-    noodles: "nudeln",
-
-    kartoffeln: "kartoffel",
-    potato: "kartoffel",
-
-    eier: "ei",
-    egg: "ei",
-
+    yoghurt: "joghurt", yogurt: "joghurt",
+    bananen: "banane", banana: "banane",
+    aepfel: "apfel", äpfel: "apfel", apple: "apfel",
+    haehnchen: "hähnchen", huhn: "hähnchen", chicken: "hähnchen",
+    kaese: "käse", cheese: "käse",
+    beef: "rind", rindfleisch: "rind",
+    pork: "schwein", schweinefleisch: "schwein",
+    rice: "reis", pasta: "nudeln", noodles: "nudeln",
+    kartoffeln: "kartoffel", potato: "kartoffel",
+    eier: "ei", egg: "ei",
     bread: "brot",
-    oats: "hafer",
-    oat: "hafer",
-    haferflocken: "hafer",
-
+    oats: "hafer", oat: "hafer", haferflocken: "hafer",
     curd: "quark",
     salmon: "lachs",
     tuna: "thunfisch",
-
-    tomatoes: "tomate",
-    tomaten: "tomate",
-    tomato: "tomate",
-
-    cucumber: "gurke",
-    gurken: "gurke",
-
+    tomatoes: "tomate", tomaten: "tomate", tomato: "tomate",
+    cucumber: "gurke", gurken: "gurke",
     lettuce: "salat"
   };
 
@@ -278,149 +224,24 @@ function getSearchTerms(query) {
     .filter(term => term.length >= 2);
 }
 
-async function loadFavorites() {
-  const { data, error } = await supabaseClient
-    .from("food_favorites")
-    .select("*")
-    .order("food_name", { ascending: true });
-
-  if (error) {
-    console.error("Fehler beim Laden der Favoriten:", error);
-    return;
-  }
-
-  favorites = data || [];
-  renderFavoritesDropdown();
-}
-
-function renderFavoritesDropdown() {
-  favoriteSelect.innerHTML = `<option value="">Favorit auswählen</option>`;
-
-  favorites.forEach(favorite => {
-    const option = document.createElement("option");
-    option.value = favorite.food_id;
-    option.textContent = favorite.food_name;
-    favoriteSelect.appendChild(option);
-  });
-}
-
-function favoriteToFoodObject(favorite) {
-  return {
-    [BLS_COLUMNS.id]: favorite.food_id,
-    [BLS_COLUMNS.nameDe]: favorite.food_name,
-    [BLS_COLUMNS.calories]: favorite.calories,
-    [BLS_COLUMNS.protein]: favorite.protein_g,
-    [BLS_COLUMNS.carbs]: favorite.carbs_g,
-    [BLS_COLUMNS.fat]: favorite.fat_g
-  };
-}
-
-function loadSelectedFavorite() {
-  const foodId = String(favoriteSelect.value).trim();
-
-  if (!foodId) {
-    alert("Bitte Favorit auswählen.");
-    return;
-  }
-
-  const favorite = favorites.find(item => String(item.food_id) === foodId);
-
-  if (!favorite) {
-    alert("Favorit wurde nicht gefunden.");
-    return;
-  }
-
-  const food = favoriteToFoodObject(favorite);
-  selectFood(food);
-}
-
-async function saveSelectedFoodAsFavorite() {
-  if (!selectedFood) {
-    alert("Bitte erst ein Lebensmittel auswählen.");
-    return;
-  }
-
-  const nutrition = getFoodNutritionPer100g(selectedFood);
-  const foodId = getFoodId(selectedFood);
-  const foodName = getFoodName(selectedFood);
-
-  if (!foodId) {
-    alert("Dieses Lebensmittel hat keine gültige BLS-ID.");
-    return;
-  }
-
-  const { error } = await supabaseClient
-    .from("food_favorites")
-    .upsert(
-      {
-        food_id: foodId,
-        food_name: foodName,
-        calories: nutrition.calories,
-        protein_g: nutrition.protein,
-        carbs_g: nutrition.carbs,
-        fat_g: nutrition.fat
-      },
-      { onConflict: "food_id" }
-    );
-
-  if (error) {
-    console.error("Fehler beim Speichern des Favoriten:", error);
-    alert("Favorit konnte nicht gespeichert werden.");
-    return;
-  }
-
-  await loadFavorites();
-  favoriteSelect.value = String(foodId);
-  alert("Favorit gespeichert.");
-}
-
-async function deleteSelectedFavorite() {
-  const foodId = String(favoriteSelect.value).trim();
-
-  if (!foodId) {
-    alert("Bitte Favorit auswählen.");
-    return;
-  }
-
-  if (!confirm("Favorit wirklich löschen?")) return;
-
-  const { error } = await supabaseClient
-    .from("food_favorites")
-    .delete()
-    .eq("food_id", foodId);
-
-  if (error) {
-    console.error("Fehler beim Löschen des Favoriten:", error);
-    alert("Favorit konnte nicht gelöscht werden.");
-    return;
-  }
-
-  favoriteSelect.value = "";
-  await loadFavorites();
-}
-
-async function searchFoods() {
-  const query = foodSearchInput.value.trim();
-
+async function searchFoodsFromInput(value) {
+  const query = value.trim();
   if (!query) {
     alert("Bitte Lebensmittel eingeben.");
     return;
   }
 
+  openAddSheet();
+  foodSearchInput.value = query;
   foodResults.innerHTML = "<p>Suche läuft...</p>";
 
   const searchTerms = getSearchTerms(query);
-
   if (searchTerms.length === 0) {
     foodResults.innerHTML = "<p>Bitte mindestens 2 Zeichen eingeben.</p>";
     return;
   }
 
-  let request = supabaseClient
-    .from(FOOD_TABLE)
-    .select("*")
-    .limit(40);
-
+  let request = supabaseClient.from(FOOD_TABLE).select("*").limit(40);
   searchTerms.forEach(term => {
     request = request.ilike(BLS_COLUMNS.nameDe, `%${term}%`);
   });
@@ -428,7 +249,7 @@ async function searchFoods() {
   const { data, error } = await request;
 
   if (error) {
-    console.error("Fehler bei der Suche:", error);
+    console.error(error);
     foodResults.innerHTML = "<p>Suche hat nicht geklappt.</p>";
     return;
   }
@@ -436,30 +257,21 @@ async function searchFoods() {
   renderFoodResults(sortFoodResults(data, searchTerms));
 }
 
-function sortFoodResults(foods, searchTerms) {
-  if (!foods) return [];
-
-  return foods.sort((a, b) => {
-    const nameA = getFoodName(a).toLowerCase();
-    const nameB = getFoodName(b).toLowerCase();
-
-    const scoreA = getSearchScore(nameA, searchTerms);
-    const scoreB = getSearchScore(nameB, searchTerms);
-
-    return scoreB - scoreA;
+function sortFoodResults(foods, terms) {
+  return (foods || []).sort((a, b) => {
+    const aName = getFoodName(a).toLowerCase();
+    const bName = getFoodName(b).toLowerCase();
+    return getSearchScore(bName, terms) - getSearchScore(aName, terms);
   });
 }
 
-function getSearchScore(foodName, searchTerms) {
+function getSearchScore(name, terms) {
   let score = 0;
-
-  searchTerms.forEach(term => {
-    if (foodName.startsWith(term)) score += 10;
-    if (foodName.includes(term)) score += 5;
-    if (foodName.includes(`,${term}`)) score += 3;
-    if (foodName.includes(` ${term}`)) score += 3;
+  terms.forEach(term => {
+    if (name.startsWith(term)) score += 10;
+    if (name.includes(term)) score += 5;
+    if (name.includes(` ${term}`)) score += 3;
   });
-
   return score;
 }
 
@@ -473,82 +285,58 @@ function renderFoodResults(foods) {
 
   foods.forEach(food => {
     const nutrition = getFoodNutritionPer100g(food);
-    const foodName = getFoodName(food);
-
     const div = document.createElement("div");
     div.className = "food-result";
-
     div.innerHTML = `
-      <strong>${foodName}</strong>
-      <small>
-        ${nutrition.calories} kcal · 
-        Protein ${nutrition.protein} g · 
-        KH ${nutrition.carbs} g · 
-        Fett ${nutrition.fat} g pro 100 g
-      </small>
+      <strong>${getFoodName(food)}</strong>
+      <small>${nutrition.calories} kcal · Protein ${nutrition.protein} g · KH ${nutrition.carbs} g · Fett ${nutrition.fat} g pro 100 g</small>
     `;
-
     div.addEventListener("click", () => selectFood(food));
-
     foodResults.appendChild(div);
   });
 }
 
 function selectFood(food) {
   selectedFood = food;
-
   selectedFoodName.textContent = getFoodName(food);
   selectedFoodBox.classList.remove("hidden");
-
   updateNutritionPreview();
 }
 
 function updateNutritionPreview() {
   if (!selectedFood) return;
-
   const amountG = toNumber(amountInput.value) || 100;
-  const nutrition = calculateNutritionForAmount(selectedFood, amountG);
+  const n = calculateNutritionForAmount(selectedFood, amountG);
 
-  previewCalories.textContent = `${nutrition.calories} kcal`;
-  previewProtein.textContent = `${nutrition.protein} g`;
-  previewCarbs.textContent = `${nutrition.carbs} g`;
-  previewFat.textContent = `${nutrition.fat} g`;
+  previewCalories.textContent = `${n.calories} kcal`;
+  previewProtein.textContent = `${n.protein} g`;
+  previewCarbs.textContent = `${n.carbs} g`;
+  previewFat.textContent = `${n.fat} g`;
 }
 
 async function saveMeal() {
-  if (!selectedFood) {
-    alert("Bitte erst ein Lebensmittel auswählen.");
-    return;
-  }
+  if (!selectedFood) return alert("Bitte erst ein Lebensmittel auswählen.");
 
   const amountG = toNumber(amountInput.value);
+  if (!amountG || amountG <= 0) return alert("Bitte eine gültige Menge eingeben.");
 
-  if (!amountG || amountG <= 0) {
-    alert("Bitte eine gültige Menge eingeben.");
-    return;
-  }
+  const n = calculateNutritionForAmount(selectedFood, amountG);
+  const eatenAt = eatenAtInput.value ? new Date(eatenAtInput.value).toISOString() : new Date().toISOString();
 
-  const nutrition = calculateNutritionForAmount(selectedFood, amountG);
-  const eatenAt = eatenAtInput.value
-    ? new Date(eatenAtInput.value).toISOString()
-    : new Date().toISOString();
-
-  const { error } = await supabaseClient
-    .from("meal_logs")
-    .insert({
-      food_id: getFoodId(selectedFood),
-      food_name: getFoodName(selectedFood),
-      meal_category: mealCategoryInput.value,
-      amount_g: amountG,
-      calories: nutrition.calories,
-      protein_g: nutrition.protein,
-      carbs_g: nutrition.carbs,
-      fat_g: nutrition.fat,
-      eaten_at: eatenAt
-    });
+  const { error } = await supabaseClient.from("meal_logs").insert({
+    food_id: getFoodId(selectedFood),
+    food_name: getFoodName(selectedFood),
+    meal_category: mealCategoryInput.value,
+    amount_g: amountG,
+    calories: n.calories,
+    protein_g: n.protein,
+    carbs_g: n.carbs,
+    fat_g: n.fat,
+    eaten_at: eatenAt
+  });
 
   if (error) {
-    console.error("Fehler beim Speichern:", error);
+    console.error(error);
     alert("Mahlzeit konnte nicht gespeichert werden.");
     return;
   }
@@ -556,33 +344,101 @@ async function saveMeal() {
   selectedFood = null;
   selectedFoodBox.classList.add("hidden");
   foodSearchInput.value = "";
+  inlineFoodSearchInput.value = "";
   foodResults.innerHTML = "";
   amountInput.value = 100;
   eatenAtInput.value = toLocalDateTimeInput(new Date());
 
-  await loadTodayMeals();
+  closeAddSheet();
+  await loadDashboard();
 }
 
-function getSelectedDashboardDateString() {
-  if (dashboardDateInput && dashboardDateInput.value) {
-    return dashboardDateInput.value;
+async function loadFavorites() {
+  const { data, error } = await supabaseClient
+    .from("food_favorites")
+    .select("*")
+    .order("food_name", { ascending: true });
+
+  if (error) {
+    console.error(error);
+    return;
   }
 
-  return toDateInput(new Date());
+  favorites = data || [];
+  renderFavoriteChips();
 }
 
-function parseDateInput(dateString) {
-  const [year, month, day] = dateString.split("-").map(Number);
-  return new Date(year, month - 1, day);
+function renderFavoriteChips() {
+  const top = favorites.slice(0, 5);
+  favoriteChips.innerHTML = "";
+  sheetFavoriteChips.innerHTML = "";
+
+  if (top.length === 0) {
+    favoriteChips.innerHTML = `<span class="empty-chip">Noch keine Favoriten</span>`;
+    sheetFavoriteChips.innerHTML = `<span class="empty-chip">Noch keine Favoriten</span>`;
+    return;
+  }
+
+  top.forEach(fav => {
+    const chip1 = createFavoriteChip(fav);
+    const chip2 = createFavoriteChip(fav);
+    favoriteChips.appendChild(chip1);
+    sheetFavoriteChips.appendChild(chip2);
+  });
+}
+
+function createFavoriteChip(fav) {
+  const btn = document.createElement("button");
+  btn.className = "food-chip";
+  btn.textContent = fav.food_name;
+  btn.addEventListener("click", () => {
+    openAddSheet();
+    selectFood({
+      [BLS_COLUMNS.id]: fav.food_id,
+      [BLS_COLUMNS.nameDe]: fav.food_name,
+      [BLS_COLUMNS.calories]: fav.calories,
+      [BLS_COLUMNS.protein]: fav.protein_g,
+      [BLS_COLUMNS.carbs]: fav.carbs_g,
+      [BLS_COLUMNS.fat]: fav.fat_g
+    });
+  });
+  return btn;
+}
+
+async function saveSelectedFoodAsFavorite() {
+  if (!selectedFood) return alert("Bitte erst ein Lebensmittel auswählen.");
+
+  const n = getFoodNutritionPer100g(selectedFood);
+  const foodId = getFoodId(selectedFood);
+
+  const { error } = await supabaseClient.from("food_favorites").upsert({
+    food_id: foodId,
+    food_name: getFoodName(selectedFood),
+    calories: n.calories,
+    protein_g: n.protein,
+    carbs_g: n.carbs,
+    fat_g: n.fat
+  }, { onConflict: "food_id" });
+
+  if (error) {
+    console.error(error);
+    alert("Favorit konnte nicht gespeichert werden.");
+    return;
+  }
+
+  await loadFavorites();
+  alert("Favorit gespeichert.");
+}
+
+function getSelectedDateString() {
+  return dashboardDateInput.value || toDateInput(new Date());
 }
 
 function getDayRange(dateString) {
   const start = parseDateInput(dateString);
   start.setHours(0, 0, 0, 0);
-
   const end = new Date(start);
   end.setDate(end.getDate() + 1);
-
   return { start, end };
 }
 
@@ -592,54 +448,35 @@ function addDays(date, days) {
   return copy;
 }
 
-function isSameLocalDay(dateA, dateB) {
-  return toDateInput(dateA) === toDateInput(dateB);
-}
-
 function getMonday(date) {
   const copy = new Date(date);
   const day = copy.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-
-  copy.setDate(copy.getDate() + diff);
+  copy.setDate(copy.getDate() + (day === 0 ? -6 : 1 - day));
   copy.setHours(0, 0, 0, 0);
-
   return copy;
+}
+
+function isSameLocalDay(a, b) {
+  return toDateInput(a) === toDateInput(b);
 }
 
 function formatDashboardDate(dateString) {
   const date = parseDateInput(dateString);
-
-  if (isSameLocalDay(date, new Date())) {
-    return "Heute";
-  }
-
-  const yesterday = addDays(new Date(), -1);
-  const tomorrow = addDays(new Date(), 1);
-
-  if (isSameLocalDay(date, yesterday)) {
-    return "Gestern";
-  }
-
-  if (isSameLocalDay(date, tomorrow)) {
-    return "Morgen";
-  }
-
-  return date.toLocaleDateString("de-DE", {
-    weekday: "short",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric"
-  });
+  if (isSameLocalDay(date, new Date())) return "Heute";
+  return date.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-async function loadTodayMeals() {
-  const selectedDateString = getSelectedDashboardDateString();
+function updateHeaderDate() {
+  headerDate.textContent = formatDashboardDate(getSelectedDateString());
+}
+
+async function loadDashboard() {
+  updateHeaderDate();
+
+  const selectedDateString = getSelectedDateString();
   const { start, end } = getDayRange(selectedDateString);
 
-  if (dayMealsTitle) {
-    dayMealsTitle.textContent = `Mahlzeiten · ${formatDashboardDate(selectedDateString)}`;
-  }
+  dayMealsTitle.textContent = `Mahlzeiten · ${formatDashboardDate(selectedDateString)}`;
 
   const { data, error } = await supabaseClient
     .from("meal_logs")
@@ -649,212 +486,147 @@ async function loadTodayMeals() {
     .order("eaten_at", { ascending: true });
 
   if (error) {
-    console.error("Fehler beim Laden der Mahlzeiten:", error);
+    console.error(error);
     todayMeals.innerHTML = "<p>Mahlzeiten konnten nicht geladen werden.</p>";
     return;
   }
 
-  renderTodayMeals(data);
-  updateTodaySummary(data);
-  renderDailyCalorieChart(data, selectedDateString);
-
+  renderMeals(data || []);
+  updateSummary(data || []);
+  renderDailyChart(data || [], selectedDateString);
   await loadWeeklyAndTrendCharts(selectedDateString);
 }
 
-function renderTodayMeals(meals) {
-  todayMeals.innerHTML = "";
+function updateSummary(meals) {
+  const totals = meals.reduce((sum, meal) => {
+    sum.calories += toNumber(meal.calories);
+    sum.protein += toNumber(meal.protein_g);
+    sum.carbs += toNumber(meal.carbs_g);
+    sum.fat += toNumber(meal.fat_g);
+    return sum;
+  }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
 
-  if (!meals || meals.length === 0) {
-    todayMeals.innerHTML = "<p>Für diesen Tag sind noch keine Mahlzeiten eingetragen.</p>";
-    return;
-  }
+  const goal = profile?.daily_calorie_goal ? toNumber(profile.daily_calorie_goal) : 0;
+  const caloriePercent = goal > 0 ? Math.min((totals.calories / goal) * 100, 100) : 0;
+  const left = goal > 0 ? goal - totals.calories : 0;
 
-  meals.forEach(meal => {
-    const div = document.createElement("div");
-    div.className = "meal-item";
-
-    div.innerHTML = `
-      <div>
-        <strong>${meal.food_name}</strong>
-        <div class="meal-meta">
-          ${meal.meal_category || "Mahlzeit"} · 
-          ${meal.amount_g} g · 
-          ${meal.calories} kcal · 
-          ${formatTime(meal.eaten_at)}
-        </div>
-      </div>
-      <button class="delete-btn">×</button>
-    `;
-
-    div.querySelector(".delete-btn").addEventListener("click", () => {
-      deleteMeal(meal.id);
-    });
-
-    todayMeals.appendChild(div);
-  });
-}
-
-function updateTodaySummary(meals) {
-  const totals = (meals || []).reduce(
-    (sum, meal) => {
-      sum.calories += toNumber(meal.calories);
-      sum.protein += toNumber(meal.protein_g);
-      sum.carbs += toNumber(meal.carbs_g);
-      sum.fat += toNumber(meal.fat_g);
-      return sum;
-    },
-    { calories: 0, protein: 0, carbs: 0, fat: 0 }
-  );
-
-  todayCalories.textContent = `${round(totals.calories, 0)} kcal`;
+  todayCalories.textContent = round(totals.calories, 0);
   todayProtein.textContent = `${round(totals.protein, 1)} g`;
   todayCarbs.textContent = `${round(totals.carbs, 1)} g`;
   todayFat.textContent = `${round(totals.fat, 1)} g`;
 
-  const goal = profile?.daily_calorie_goal ? toNumber(profile.daily_calorie_goal) : 0;
+  calorieGoalText.textContent = goal > 0 ? `von ${goal} kcal` : "Ziel nicht gesetzt";
+  calorieLeftText.textContent = goal > 0 ? `${Math.abs(round(left, 0))} kcal ${left >= 0 ? "frei" : "drüber"}` : `${round(totals.calories, 0)} kcal`;
+  dailyStatusText.textContent = goal > 0
+    ? left >= 0 ? "Du bist noch im Zielbereich." : "Du bist über deinem Tagesziel."
+    : "Setze ein Kalorienziel im Profil.";
 
-  if (goal > 0) {
-    const percent = Math.min((totals.calories / goal) * 100, 100);
-    calorieProgress.style.width = `${percent}%`;
-    calorieGoalText.textContent = `Ziel: ${goal} kcal`;
-  } else {
-    calorieProgress.style.width = "0%";
-    calorieGoalText.textContent = "Ziel: nicht gesetzt";
-  }
+  setDonut(caloriePercent);
+
+  updateMacroBar(proteinProgress, proteinPercent, totals.protein, 150);
+  updateMacroBar(carbsProgress, carbsPercent, totals.carbs, 300);
+  updateMacroBar(fatProgress, fatPercent, totals.fat, 80);
 }
 
-function renderDailyCalorieChart(meals, selectedDateString) {
-  if (!dailyCalorieChart) return;
+function setDonut(percent) {
+  const radius = 64;
+  const circumference = 2 * Math.PI * radius;
+  calorieDonut.style.strokeDasharray = circumference;
+  calorieDonut.style.strokeDashoffset = circumference - (percent / 100) * circumference;
+}
 
-  const sortedMeals = (meals || [])
-    .slice()
-    .sort((a, b) => new Date(a.eaten_at) - new Date(b.eaten_at));
+function updateMacroBar(bar, label, value, target) {
+  const percent = Math.min((value / target) * 100, 100);
+  bar.style.width = `${percent}%`;
+  label.textContent = `${round(percent, 0)}%`;
+}
 
-  const totalCalories = sortedMeals.reduce((sum, meal) => {
-    return sum + toNumber(meal.calories);
-  }, 0);
+function renderMeals(meals) {
+  todayMeals.innerHTML = "";
 
-  dailyChartTotal.textContent = `${round(totalCalories, 0)} kcal`;
-
-  if (sortedMeals.length === 0) {
-    dailyChartInfo.textContent = "Noch keine Mahlzeiten an diesem Tag.";
-    dailyCalorieChart.innerHTML = `
-      <div class="chart-empty">
-        Für diesen Tag gibt es noch keinen Kalorienverlauf.
-      </div>
-    `;
+  if (meals.length === 0) {
+    todayMeals.innerHTML = "<p>Für diesen Tag sind noch keine Mahlzeiten eingetragen.</p>";
     return;
   }
 
-  dailyChartInfo.textContent =
-    `${sortedMeals.length} Mahlzeit${sortedMeals.length === 1 ? "" : "en"} · ${formatTime(sortedMeals[0].eaten_at)} bis ${formatTime(sortedMeals[sortedMeals.length - 1].eaten_at)}`;
+  const groups = ["Frühstück", "Mittagessen", "Abendessen", "Snack"];
+
+  groups.forEach(group => {
+    const groupMeals = meals.filter(meal => (meal.meal_category || "Snack") === group);
+    if (groupMeals.length === 0) return;
+
+    const title = document.createElement("h4");
+    title.className = "meal-group-title";
+    title.textContent = group;
+    todayMeals.appendChild(title);
+
+    groupMeals.forEach(meal => {
+      const div = document.createElement("div");
+      div.className = "meal-item";
+      div.innerHTML = `
+        <div>
+          <strong>${meal.food_name}</strong>
+          <div class="meal-meta">${meal.amount_g} g · ${meal.calories} kcal · ${formatTime(meal.eaten_at)}</div>
+        </div>
+        <button class="delete-btn">×</button>
+      `;
+      div.querySelector(".delete-btn").addEventListener("click", () => deleteMeal(meal.id));
+      todayMeals.appendChild(div);
+    });
+  });
+}
+
+async function deleteMeal(id) {
+  if (!confirm("Mahlzeit löschen?")) return;
+  const { error } = await supabaseClient.from("meal_logs").delete().eq("id", id);
+  if (error) return alert("Mahlzeit konnte nicht gelöscht werden.");
+  await loadDashboard();
+}
+
+function renderDailyChart(meals, selectedDateString) {
+  const sorted = meals.slice().sort((a, b) => new Date(a.eaten_at) - new Date(b.eaten_at));
+  const total = sorted.reduce((s, m) => s + toNumber(m.calories), 0);
+  dailyChartTotal.textContent = `${round(total, 0)} kcal`;
+
+  if (sorted.length === 0) {
+    dailyChartInfo.textContent = "Keine Daten";
+    dailyCalorieChart.innerHTML = `<div class="chart-empty">Für diesen Tag gibt es noch keinen Verlauf.</div>`;
+    return;
+  }
+
+  dailyChartInfo.textContent = `${sorted.length} Mahlzeit${sorted.length === 1 ? "" : "en"}`;
 
   const goal = profile?.daily_calorie_goal ? toNumber(profile.daily_calorie_goal) : 0;
-  const maxY = Math.max(totalCalories, goal, 100);
-
-  const width = 760;
-  const height = 280;
-  const paddingLeft = 58;
-  const paddingRight = 26;
-  const paddingTop = 24;
-  const paddingBottom = 46;
-
-  const chartWidth = width - paddingLeft - paddingRight;
-  const chartHeight = height - paddingTop - paddingBottom;
-
+  const maxY = Math.max(total, goal, 100);
+  const width = 760, height = 260, left = 54, right = 24, top = 24, bottom = 44;
+  const chartW = width - left - right;
+  const chartH = height - top - bottom;
   const { start, end } = getDayRange(selectedDateString);
 
-  function getX(dateValue) {
-    const date = new Date(dateValue);
-    const progress = (date - start) / (end - start);
-    const clamped = Math.min(Math.max(progress, 0), 1);
+  const getX = dateValue => left + Math.min(Math.max((new Date(dateValue) - start) / (end - start), 0), 1) * chartW;
+  const getY = kcal => top + chartH - (kcal / maxY) * chartH;
 
-    return paddingLeft + clamped * chartWidth;
-  }
+  let running = 0;
+  const points = [{ x: left, y: getY(0) }];
 
-  function getY(kcal) {
-    return paddingTop + chartHeight - (kcal / maxY) * chartHeight;
-  }
-
-  const gridLines = buildGridLines({
-    width,
-    paddingLeft,
-    paddingRight,
-    maxY,
-    getY
-  });
-
-  const xLabels = [
-    { label: "00:00", hour: 0 },
-    { label: "06:00", hour: 6 },
-    { label: "12:00", hour: 12 },
-    { label: "18:00", hour: 18 },
-    { label: "24:00", hour: 24 }
-  ].map(item => {
-    const labelDate = new Date(start);
-    labelDate.setHours(item.hour, 0, 0, 0);
-
-    const x = item.hour === 24 ? width - paddingRight : getX(labelDate);
-
-    return `
-      <text class="chart-x-label" x="${x}" y="${height - 16}" text-anchor="middle">${item.label}</text>
-    `;
-  }).join("");
-
-  let runningCalories = 0;
-
-  const points = [
-    {
-      x: paddingLeft,
-      y: getY(0)
-    }
-  ];
-
-  const dots = sortedMeals.map(meal => {
-    runningCalories += toNumber(meal.calories);
-
+  const dots = sorted.map(meal => {
+    running += toNumber(meal.calories);
     const x = getX(meal.eaten_at);
-    const y = getY(runningCalories);
-
+    const y = getY(running);
     points.push({ x, y });
-
-    return `
-      <circle class="chart-dot" cx="${x}" cy="${y}" r="6">
-        <title>${escapeHtml(meal.food_name)} · ${round(meal.calories, 0)} kcal · Gesamt: ${round(runningCalories, 0)} kcal</title>
-      </circle>
-    `;
+    return `<circle class="chart-dot" cx="${x}" cy="${y}" r="6"><title>${escapeHtml(meal.food_name)} · ${running} kcal</title></circle>`;
   }).join("");
 
   const selectedDate = parseDateInput(selectedDateString);
-  const now = new Date();
-
-  let lineEndDate = end;
-
-  if (isSameLocalDay(selectedDate, now)) {
-    lineEndDate = now;
-  }
-
-  points.push({
-    x: getX(lineEndDate),
-    y: getY(runningCalories)
-  });
-
-  const path = pointsToPath(points);
-
-  const goalLine = buildGoalLine({
-    goal,
-    getY,
-    width,
-    paddingLeft,
-    paddingRight
-  });
+  const lineEnd = isSameLocalDay(selectedDate, new Date()) ? new Date() : end;
+  points.push({ x: getX(lineEnd), y: getY(running) });
 
   dailyCalorieChart.innerHTML = `
-    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Kalorienverlauf am Tag">
-      ${gridLines}
-      ${xLabels}
-      ${goalLine}
-      <path class="chart-calorie-line" d="${path}"></path>
+    <svg viewBox="0 0 ${width} ${height}">
+      ${buildGrid(width, left, right, maxY, getY)}
+      ${buildTimeLabels(width, height, left, right, start, getX)}
+      ${buildGoal(goal, getY, width, left, right)}
+      <path class="chart-calorie-line" d="${pointsToPath(points)}"></path>
       ${dots}
     </svg>
   `;
@@ -862,346 +634,133 @@ function renderDailyCalorieChart(meals, selectedDateString) {
 
 async function loadWeeklyAndTrendCharts(selectedDateString) {
   const selectedDate = parseDateInput(selectedDateString);
-
   const weekStart = getMonday(selectedDate);
   const weekEnd = addDays(weekStart, 7);
-
   const trendStart = addDays(selectedDate, -29);
   trendStart.setHours(0, 0, 0, 0);
-
   const trendEnd = addDays(selectedDate, 1);
   trendEnd.setHours(0, 0, 0, 0);
 
-  const [weeklyResult, trendResult] = await Promise.all([
-    supabaseClient
-      .from("meal_logs")
-      .select("*")
-      .gte("eaten_at", weekStart.toISOString())
-      .lt("eaten_at", weekEnd.toISOString()),
-
-    supabaseClient
-      .from("meal_logs")
-      .select("*")
-      .gte("eaten_at", trendStart.toISOString())
-      .lt("eaten_at", trendEnd.toISOString())
+  const [weekly, trend] = await Promise.all([
+    supabaseClient.from("meal_logs").select("*").gte("eaten_at", weekStart.toISOString()).lt("eaten_at", weekEnd.toISOString()),
+    supabaseClient.from("meal_logs").select("*").gte("eaten_at", trendStart.toISOString()).lt("eaten_at", trendEnd.toISOString())
   ]);
 
-  if (weeklyResult.error) {
-    console.error("Fehler beim Laden der Wochenwerte:", weeklyResult.error);
-    weeklyCalorieChart.innerHTML = "<p>Wochenwerte konnten nicht geladen werden.</p>";
-  } else {
-    renderWeeklyCalorieChart(weeklyResult.data || [], weekStart);
-  }
-
-  if (trendResult.error) {
-    console.error("Fehler beim Laden des Trends:", trendResult.error);
-    trendCalorieChart.innerHTML = "<p>Trendwerte konnten nicht geladen werden.</p>";
-  } else {
-    renderTrendCalorieChart(trendResult.data || [], trendStart, 30);
-  }
+  if (!weekly.error) renderWeeklyChart(weekly.data || [], weekStart);
+  if (!trend.error) renderTrendChart(trend.data || [], trendStart, 30);
 }
 
 function createDailyTotals(meals, startDate, days) {
   const totals = [];
-
   for (let i = 0; i < days; i++) {
     const date = addDays(startDate, i);
-    const key = toDateInput(date);
-
-    totals.push({
-      date,
-      key,
-      calories: 0
-    });
+    totals.push({ date, key: toDateInput(date), calories: 0 });
   }
 
   meals.forEach(meal => {
     const key = toDateInput(new Date(meal.eaten_at));
     const entry = totals.find(item => item.key === key);
-
-    if (entry) {
-      entry.calories += toNumber(meal.calories);
-    }
+    if (entry) entry.calories += toNumber(meal.calories);
   });
 
   return totals;
 }
 
-function renderWeeklyCalorieChart(meals, weekStart) {
-  if (!weeklyCalorieChart) return;
-
+function renderWeeklyChart(meals, weekStart) {
   const days = createDailyTotals(meals, weekStart, 7);
-  const weeklyTotal = days.reduce((sum, day) => sum + day.calories, 0);
+  const total = days.reduce((s, d) => s + d.calories, 0);
 
-  weeklyChartTotal.textContent = `${round(weeklyTotal, 0)} kcal`;
-  weeklyChartInfo.textContent =
-    `${formatShortDate(days[0].date)} bis ${formatShortDate(days[6].date)}`;
+  weeklyChartTotal.textContent = `${round(total, 0)} kcal`;
+  weeklyChartInfo.textContent = `${formatShortDate(days[0].date)} bis ${formatShortDate(days[6].date)}`;
 
-  renderSimpleLineChart({
-    container: weeklyCalorieChart,
-    points: days.map(day => ({
-      label: day.date.toLocaleDateString("de-DE", { weekday: "short" }),
-      title: `${day.date.toLocaleDateString("de-DE")} · ${round(day.calories, 0)} kcal`,
-      value: day.calories
-    })),
-    goal: profile?.daily_calorie_goal ? toNumber(profile.daily_calorie_goal) : 0,
-    emptyText: "Für diese Woche sind noch keine Mahlzeiten eingetragen.",
-    showAllLabels: true
-  });
+  renderLineChart(weeklyCalorieChart, days.map(day => ({
+    label: day.date.toLocaleDateString("de-DE", { weekday: "short" }),
+    value: day.calories,
+    title: `${day.date.toLocaleDateString("de-DE")} · ${round(day.calories, 0)} kcal`
+  })), true);
 }
 
-function renderTrendCalorieChart(meals, trendStart, daysCount) {
-  if (!trendCalorieChart) return;
-
-  const days = createDailyTotals(meals, trendStart, daysCount);
-  const total = days.reduce((sum, day) => sum + day.calories, 0);
-  const average = daysCount > 0 ? total / daysCount : 0;
+function renderTrendChart(meals, startDate, count) {
+  const days = createDailyTotals(meals, startDate, count);
+  const total = days.reduce((s, d) => s + d.calories, 0);
+  const average = total / count;
 
   trendChartAverage.textContent = `${round(average, 0)} kcal Ø`;
-  trendChartInfo.textContent =
-    `${formatShortDate(days[0].date)} bis ${formatShortDate(days[days.length - 1].date)}`;
+  trendChartInfo.textContent = `${formatShortDate(days[0].date)} bis ${formatShortDate(days[count - 1].date)}`;
 
-  const movingAverage = days.map((day, index) => {
-    const startIndex = Math.max(0, index - 6);
-    const relevantDays = days.slice(startIndex, index + 1);
-    const relevantTotal = relevantDays.reduce((sum, item) => sum + item.calories, 0);
-
-    return relevantTotal / relevantDays.length;
-  });
-
-  renderSimpleLineChart({
-    container: trendCalorieChart,
-    points: days.map((day, index) => ({
-      label: index % 7 === 0 || index === days.length - 1
-        ? day.date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })
-        : "",
-      title: `${day.date.toLocaleDateString("de-DE")} · ${round(day.calories, 0)} kcal`,
-      value: day.calories,
-      average: movingAverage[index]
-    })),
-    goal: profile?.daily_calorie_goal ? toNumber(profile.daily_calorie_goal) : 0,
-    emptyText: "Noch keine Daten für den 30-Tage-Trend.",
-    showAverage: true
-  });
+  renderLineChart(trendCalorieChart, days.map((day, i) => ({
+    label: i % 7 === 0 || i === count - 1 ? formatShortDate(day.date) : "",
+    value: day.calories,
+    title: `${day.date.toLocaleDateString("de-DE")} · ${round(day.calories, 0)} kcal`
+  })), false);
 }
 
-function renderSimpleLineChart({
-  container,
-  points,
-  goal = 0,
-  emptyText = "Keine Daten vorhanden.",
-  showAllLabels = false,
-  showAverage = false
-}) {
-  const hasData = points.some(point => toNumber(point.value) > 0);
-
+function renderLineChart(container, points, showAllLabels) {
+  const hasData = points.some(p => p.value > 0);
   if (!hasData) {
-    container.innerHTML = `
-      <div class="chart-empty">
-        ${emptyText}
-      </div>
-    `;
+    container.innerHTML = `<div class="chart-empty">Noch keine Daten vorhanden.</div>`;
     return;
   }
 
-  const width = 760;
-  const height = 280;
-  const paddingLeft = 58;
-  const paddingRight = 26;
-  const paddingTop = 24;
-  const paddingBottom = 46;
+  const width = 760, height = 260, left = 54, right = 24, top = 24, bottom = 44;
+  const chartW = width - left - right;
+  const chartH = height - top - bottom;
+  const maxY = Math.max(...points.map(p => p.value), profile?.daily_calorie_goal || 0, 100);
 
-  const chartWidth = width - paddingLeft - paddingRight;
-  const chartHeight = height - paddingTop - paddingBottom;
+  const getX = i => left + (i / (points.length - 1)) * chartW;
+  const getY = value => top + chartH - (value / maxY) * chartH;
 
-  const maxValue = Math.max(
-    ...points.map(point => toNumber(point.value)),
-    ...points.map(point => toNumber(point.average)),
-    goal,
-    100
-  );
+  const linePoints = points.map((p, i) => ({ x: getX(i), y: getY(p.value) }));
 
-  function getX(index) {
-    if (points.length <= 1) return paddingLeft;
-    return paddingLeft + (index / (points.length - 1)) * chartWidth;
-  }
-
-  function getY(value) {
-    return paddingTop + chartHeight - (toNumber(value) / maxValue) * chartHeight;
-  }
-
-  const gridLines = buildGridLines({
-    width,
-    paddingLeft,
-    paddingRight,
-    maxY: maxValue,
-    getY
-  });
-
-  const linePoints = points.map((point, index) => ({
-    x: getX(index),
-    y: getY(point.value)
-  }));
-
-  const path = pointsToPath(linePoints);
-
-  const dots = points.map((point, index) => {
-    const x = getX(index);
-    const y = getY(point.value);
-
-    return `
-      <circle class="chart-dot" cx="${x}" cy="${y}" r="5">
-        <title>${escapeHtml(point.title)}</title>
-      </circle>
-    `;
+  const labels = points.map((p, i) => {
+    if (!showAllLabels && !p.label) return "";
+    return `<text class="chart-x-label" x="${getX(i)}" y="${height - 16}" text-anchor="middle">${p.label}</text>`;
   }).join("");
 
-  const xLabels = points.map((point, index) => {
-    if (!showAllLabels && !point.label) return "";
-
-    return `
-      <text class="chart-x-label" x="${getX(index)}" y="${height - 16}" text-anchor="middle">${point.label}</text>
-    `;
-  }).join("");
-
-  let averagePath = "";
-
-  if (showAverage) {
-    const averagePoints = points.map((point, index) => ({
-      x: getX(index),
-      y: getY(point.average)
-    }));
-
-    averagePath = `
-      <path class="chart-average-line" d="${pointsToPath(averagePoints)}"></path>
-    `;
-  }
-
-  const goalLine = buildGoalLine({
-    goal,
-    getY,
-    width,
-    paddingLeft,
-    paddingRight
-  });
+  const dots = points.map((p, i) => `
+    <circle class="chart-dot" cx="${getX(i)}" cy="${getY(p.value)}" r="5">
+      <title>${escapeHtml(p.title)}</title>
+    </circle>
+  `).join("");
 
   container.innerHTML = `
-    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Kaloriendiagramm">
-      ${gridLines}
-      ${xLabels}
-      ${goalLine}
-      <path class="chart-calorie-line" d="${path}"></path>
-      ${averagePath}
+    <svg viewBox="0 0 ${width} ${height}">
+      ${buildGrid(width, left, right, maxY, getY)}
+      ${labels}
+      ${buildGoal(profile?.daily_calorie_goal || 0, getY, width, left, right)}
+      <path class="chart-calorie-line" d="${pointsToPath(linePoints)}"></path>
       ${dots}
     </svg>
   `;
 }
 
-function buildGridLines({
-  width,
-  paddingLeft,
-  paddingRight,
-  maxY,
-  getY
-}) {
-  const gridValues = [0, 0.25, 0.5, 0.75, 1].map(factor => round(maxY * factor, 0));
-
-  return gridValues.map(value => {
+function buildGrid(width, left, right, maxY, getY) {
+  return [0, .25, .5, .75, 1].map(f => {
+    const value = round(maxY * f, 0);
     const y = getY(value);
-
-    return `
-      <line class="chart-grid-line" x1="${paddingLeft}" y1="${y}" x2="${width - paddingRight}" y2="${y}"></line>
-      <text class="chart-y-label" x="${paddingLeft - 10}" y="${y + 4}" text-anchor="end">${value}</text>
-    `;
+    return `<line class="chart-grid-line" x1="${left}" y1="${y}" x2="${width - right}" y2="${y}"></line>
+            <text class="chart-y-label" x="${left - 8}" y="${y + 4}" text-anchor="end">${value}</text>`;
   }).join("");
 }
 
-function buildGoalLine({
-  goal,
-  getY,
-  width,
-  paddingLeft,
-  paddingRight
-}) {
+function buildTimeLabels(width, height, left, right, start, getX) {
+  return [0, 6, 12, 18, 24].map(hour => {
+    const date = new Date(start);
+    date.setHours(hour, 0, 0, 0);
+    const x = hour === 24 ? width - right : getX(date);
+    return `<text class="chart-x-label" x="${x}" y="${height - 16}" text-anchor="middle">${String(hour).padStart(2, "0")}:00</text>`;
+  }).join("");
+}
+
+function buildGoal(goal, getY, width, left, right) {
   if (!goal || goal <= 0) return "";
-
-  const goalY = getY(goal);
-
-  return `
-    <line class="chart-goal-line" x1="${paddingLeft}" y1="${goalY}" x2="${width - paddingRight}" y2="${goalY}"></line>
-    <text class="chart-goal-label" x="${width - paddingRight}" y="${goalY - 8}" text-anchor="end">Ziel ${goal} kcal</text>
-  `;
+  const y = getY(goal);
+  return `<line class="chart-goal-line" x1="${left}" y1="${y}" x2="${width - right}" y2="${y}"></line>
+          <text class="chart-goal-label" x="${width - right}" y="${y - 8}" text-anchor="end">Ziel ${goal}</text>`;
 }
 
 function pointsToPath(points) {
-  if (!points || points.length === 0) return "";
-
-  return points
-    .map((point, index) => {
-      return `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`;
-    })
-    .join(" ");
-}
-
-function formatShortDate(date) {
-  return date.toLocaleDateString("de-DE", {
-    day: "2-digit",
-    month: "2-digit"
-  });
-}
-
-function changeDashboardDate(days) {
-  const currentDateString = getSelectedDashboardDateString();
-  const currentDate = parseDateInput(currentDateString);
-  const newDate = addDays(currentDate, days);
-
-  dashboardDateInput.value = toDateInput(newDate);
-  loadTodayMeals();
-}
-
-async function deleteMeal(id) {
-  if (!confirm("Mahlzeit löschen?")) return;
-
-  const { error } = await supabaseClient
-    .from("meal_logs")
-    .delete()
-    .eq("id", id);
-
-  if (error) {
-    console.error("Fehler beim Löschen:", error);
-    alert("Mahlzeit konnte nicht gelöscht werden.");
-    return;
-  }
-
-  await loadTodayMeals();
-}
-
-async function saveWeight() {
-  const weightKg = toNumber(weightInput.value);
-  const loggedAt = weightDateInput.value;
-
-  if (!weightKg || !loggedAt) {
-    alert("Bitte Gewicht und Datum eingeben.");
-    return;
-  }
-
-  const { error } = await supabaseClient
-    .from("weight_logs")
-    .insert({
-      weight_kg: weightKg,
-      logged_at: loggedAt
-    });
-
-  if (error) {
-    console.error("Fehler beim Speichern:", error);
-    alert("Gewicht konnte nicht gespeichert werden.");
-    return;
-  }
-
-  weightInput.value = "";
-  weightDateInput.value = toDateInput(new Date());
-
-  await loadWeights();
+  return points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
 }
 
 async function loadWeights() {
@@ -1212,19 +771,50 @@ async function loadWeights() {
     .limit(10);
 
   if (error) {
-    console.error("Fehler beim Laden der Gewichte:", error);
-    weightList.innerHTML = "<p>Gewichte konnten nicht geladen werden.</p>";
+    console.error(error);
     return;
   }
 
-  renderWeights(data);
-  renderWeightSummary(data);
+  latestWeights = data || [];
+  renderWeightWidget();
+  renderWeights(latestWeights);
+  renderWeightSummary(latestWeights);
+}
+
+function renderWeightWidget() {
+  if (latestWeights.length === 0) {
+    currentWeightText.textContent = "Noch kein Eintrag";
+    weightGoalText.textContent = "Ziel nicht gesetzt";
+    weightDiffText.textContent = "–";
+    weightTrendText.textContent = "Kein Trend";
+    return;
+  }
+
+  const latest = latestWeights[0];
+  const previous = latestWeights[1];
+  const target = profile?.target_weight_kg ? toNumber(profile.target_weight_kg) : 0;
+
+  currentWeightText.textContent = `${latest.weight_kg} kg`;
+  weightGoalText.textContent = target > 0 ? `Ziel: ${target} kg` : "Ziel nicht gesetzt";
+
+  if (target > 0) {
+    const diff = round(toNumber(latest.weight_kg) - target, 1);
+    weightDiffText.textContent = `${diff > 0 ? "+" : ""}${diff} kg`;
+  } else {
+    weightDiffText.textContent = "–";
+  }
+
+  if (previous) {
+    const trend = round(toNumber(latest.weight_kg) - toNumber(previous.weight_kg), 1);
+    weightTrendText.textContent = `${trend > 0 ? "↗ +" : trend < 0 ? "↘ " : "→ "}${trend} kg`;
+  } else {
+    weightTrendText.textContent = "Kein Trend";
+  }
 }
 
 function renderWeights(weights) {
   weightList.innerHTML = "";
-
-  if (!weights || weights.length === 0) {
+  if (weights.length === 0) {
     weightList.innerHTML = "<p>Noch keine Gewichtseinträge.</p>";
     return;
   }
@@ -1232,7 +822,6 @@ function renderWeights(weights) {
   weights.forEach(entry => {
     const div = document.createElement("div");
     div.className = "weight-item";
-
     div.innerHTML = `
       <div>
         <strong>${entry.weight_kg} kg</strong>
@@ -1240,53 +829,42 @@ function renderWeights(weights) {
       </div>
       <button class="delete-btn">×</button>
     `;
-
-    div.querySelector(".delete-btn").addEventListener("click", () => {
-      deleteWeight(entry.id);
-    });
-
+    div.querySelector(".delete-btn").addEventListener("click", () => deleteWeight(entry.id));
     weightList.appendChild(div);
   });
 }
 
 function renderWeightSummary(weights) {
-  if (!weights || weights.length === 0) {
+  if (weights.length === 0) {
     weightSummary.innerHTML = "Noch kein Gewicht eingetragen.";
     return;
   }
 
-  const latest = weights[0];
-  const target = profile?.target_weight_kg ? toNumber(profile.target_weight_kg) : 0;
+  weightSummary.innerHTML = `<strong>Aktuelles Gewicht:</strong> ${weights[0].weight_kg} kg`;
+}
 
-  if (target > 0) {
-    const diff = round(toNumber(latest.weight_kg) - target, 1);
-    weightSummary.innerHTML = `
-      <strong>Aktuelles Gewicht:</strong> ${latest.weight_kg} kg<br>
-      <strong>Zielgewicht:</strong> ${target} kg<br>
-      <strong>Differenz:</strong> ${diff > 0 ? "+" : ""}${diff} kg
-    `;
-  } else {
-    weightSummary.innerHTML = `
-      <strong>Aktuelles Gewicht:</strong> ${latest.weight_kg} kg<br>
-      <span>Zielgewicht noch nicht gesetzt.</span>
-    `;
-  }
+async function saveWeight() {
+  const weightKg = toNumber(weightInput.value);
+  const loggedAt = weightDateInput.value;
+
+  if (!weightKg || !loggedAt) return alert("Bitte Gewicht und Datum eingeben.");
+
+  const { error } = await supabaseClient.from("weight_logs").insert({
+    weight_kg: weightKg,
+    logged_at: loggedAt
+  });
+
+  if (error) return alert("Gewicht konnte nicht gespeichert werden.");
+
+  weightInput.value = "";
+  weightDateInput.value = toDateInput(new Date());
+  await loadWeights();
 }
 
 async function deleteWeight(id) {
   if (!confirm("Gewichtseintrag löschen?")) return;
-
-  const { error } = await supabaseClient
-    .from("weight_logs")
-    .delete()
-    .eq("id", id);
-
-  if (error) {
-    console.error("Fehler beim Löschen:", error);
-    alert("Gewicht konnte nicht gelöscht werden.");
-    return;
-  }
-
+  const { error } = await supabaseClient.from("weight_logs").delete().eq("id", id);
+  if (error) return alert("Gewicht konnte nicht gelöscht werden.");
   await loadWeights();
 }
 
@@ -1298,7 +876,7 @@ async function loadProfile() {
     .maybeSingle();
 
   if (error) {
-    console.error("Fehler beim Laden des Profils:", error);
+    console.error(error);
     return;
   }
 
@@ -1333,32 +911,50 @@ async function saveProfile() {
     .select()
     .single();
 
-  if (error) {
-    console.error("Fehler beim Speichern:", error);
-    alert("Profil konnte nicht gespeichert werden.");
-    return;
-  }
+  if (error) return alert("Profil konnte nicht gespeichert werden.");
 
   profile = data;
   alert("Profil gespeichert.");
-
-  await loadTodayMeals();
+  await loadDashboard();
   await loadWeights();
 }
 
-function formatDate(dateString) {
-  if (!dateString) return "";
+function openAddSheet() {
+  addSheet.classList.remove("hidden");
+  sheetOverlay.classList.remove("hidden");
+}
 
-  return new Date(dateString).toLocaleDateString("de-DE");
+function closeAddSheet() {
+  addSheet.classList.add("hidden");
+  sheetOverlay.classList.add("hidden");
+}
+
+function openProfileDrawer() {
+  profileDrawer.classList.remove("hidden");
+  sheetOverlay.classList.remove("hidden");
+}
+
+function closeProfileDrawer() {
+  profileDrawer.classList.add("hidden");
+  sheetOverlay.classList.add("hidden");
+}
+
+function changeDashboardDate(days) {
+  const date = parseDateInput(getSelectedDateString());
+  dashboardDateInput.value = toDateInput(addDays(date, days));
+  loadDashboard();
+}
+
+function formatDate(dateString) {
+  return dateString ? new Date(dateString).toLocaleDateString("de-DE") : "";
 }
 
 function formatTime(dateString) {
-  if (!dateString) return "";
+  return dateString ? new Date(dateString).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : "";
+}
 
-  return new Date(dateString).toLocaleTimeString("de-DE", {
-    hour: "2-digit",
-    minute: "2-digit"
-  });
+function formatShortDate(date) {
+  return date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
 }
 
 function escapeHtml(value) {
@@ -1370,53 +966,48 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-searchFoodBtn.addEventListener("click", searchFoods);
-
-foodSearchInput.addEventListener("keydown", event => {
-  if (event.key === "Enter") {
-    searchFoods();
-  }
+searchFoodBtn.addEventListener("click", () => searchFoodsFromInput(foodSearchInput.value));
+foodSearchInput.addEventListener("keydown", e => {
+  if (e.key === "Enter") searchFoodsFromInput(foodSearchInput.value);
 });
-
-favoriteSelect.addEventListener("change", () => {
-  if (favoriteSelect.value) {
-    loadSelectedFavorite();
-  }
+inlineFoodSearchInput.addEventListener("keydown", e => {
+  if (e.key === "Enter") searchFoodsFromInput(inlineFoodSearchInput.value);
 });
-
-loadFavoriteBtn.addEventListener("click", loadSelectedFavorite);
-deleteFavoriteBtn.addEventListener("click", deleteSelectedFavorite);
-saveFavoriteBtn.addEventListener("click", saveSelectedFoodAsFavorite);
 
 amountInput.addEventListener("input", updateNutritionPreview);
 saveMealBtn.addEventListener("click", saveMeal);
+saveFavoriteBtn.addEventListener("click", saveSelectedFoodAsFavorite);
+
 saveWeightBtn.addEventListener("click", saveWeight);
 saveProfileBtn.addEventListener("click", saveProfile);
 
-if (dashboardDateInput) {
-  dashboardDateInput.addEventListener("change", loadTodayMeals);
-}
+dashboardDateInput.addEventListener("change", loadDashboard);
+prevDayBtn.addEventListener("click", () => changeDashboardDate(-1));
+nextDayBtn.addEventListener("click", () => changeDashboardDate(1));
+todayBtn.addEventListener("click", () => {
+  dashboardDateInput.value = toDateInput(new Date());
+  loadDashboard();
+});
 
-if (prevDayBtn) {
-  prevDayBtn.addEventListener("click", () => changeDashboardDate(-1));
-}
+fabBtn.addEventListener("click", openAddSheet);
+openAddSheetBtn.addEventListener("click", openAddSheet);
+navAddBtn.addEventListener("click", openAddSheet);
+closeAddSheetBtn.addEventListener("click", closeAddSheet);
 
-if (todayBtn) {
-  todayBtn.addEventListener("click", () => {
-    dashboardDateInput.value = toDateInput(new Date());
-    loadTodayMeals();
-  });
-}
+openProfileBtn.addEventListener("click", openProfileDrawer);
+closeProfileBtn.addEventListener("click", closeProfileDrawer);
+weightWidget.addEventListener("click", openProfileDrawer);
 
-if (nextDayBtn) {
-  nextDayBtn.addEventListener("click", () => changeDashboardDate(1));
-}
+sheetOverlay.addEventListener("click", () => {
+  closeAddSheet();
+  closeProfileDrawer();
+});
 
 async function initApp() {
   initDefaults();
   await loadProfile();
   await loadFavorites();
-  await loadTodayMeals();
+  await loadDashboard();
   await loadWeights();
 }
 
