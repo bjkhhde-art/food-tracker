@@ -438,6 +438,40 @@ button {
   gap: 10px;
 }
 
+.scrollable-favorites {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dashboard-favorites {
+  max-height: 260px;
+}
+
+.sheet-favorites {
+  max-height: 220px;
+}
+
+.scrollable-favorites::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollable-favorites::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 999px;
+}
+
+.scrollable-favorites::-webkit-scrollbar-thumb {
+  background: rgba(34, 197, 94, 0.45);
+  border-radius: 999px;
+}
+
+.scrollable-favorites::-webkit-scrollbar-thumb:hover {
+  background: rgba(18, 148, 71, 0.7);
+}
+
 .food-chip,
 .empty-chip {
   padding: 10px 14px;
@@ -782,5 +816,13 @@ hr {
   .chart-header strong {
     width: 100%;
     text-align: center;
+  }
+
+  .dashboard-favorites {
+    max-height: 330px;
+  }
+
+  .sheet-favorites {
+    max-height: 300px;
   }
 }
