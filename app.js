@@ -492,8 +492,17 @@ function renderFoodResults(foods) {
 
 function selectFood(food) {
   selectedFood = food;
+
   selectedFoodName.textContent = getFoodName(food);
   selectedFoodBox.classList.remove("hidden");
+
+  foodResults.insertAdjacentElement("beforebegin", selectedFoodBox);
+
+  selectedFoodBox.scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
+
   updateNutritionPreview();
 }
 
