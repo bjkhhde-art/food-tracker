@@ -3,6 +3,7 @@ const SUPABASE_KEY = "sb_publishable_uunR3UQ9rttiK8dG85IedQ__Tn1duVK";
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const FOOD_TABLE = "bls_foods";
+const OPENFOOD_CACHE_TABLE = "openfood_cache";
 const OPENFOOD_API_BASE = "https://world.openfoodfacts.org";
 
 const BLS_COLUMNS = {
@@ -144,7 +145,7 @@ function initDefaults() {
 
   updateHeaderDate();
 
-  foodSearchInput.placeholder = "BLS suchen oder Barcode eingeben";
+  foodSearchInput.placeholder = "BLS, OpenFood-Cache oder Barcode suchen";
   inlineFoodSearchInput.placeholder = "Lebensmittel oder Barcode suchen";
 }
 
@@ -199,8 +200,13 @@ function getValue(food, names) {
 }
 
 function getFoodId(food) {
-  if (food.source === "openfood") return `openfood:${food.code}`;
-  if (food.source === "favorite") return String(food.food_id || "").trim();
+  if (food.source === "openfood" || food.source === "openfood_cache") {
+    return `openfood:${food.code}`;
+  }
+
+  if (food.source === "favorite") {
+    return String(food.food_id || "").trim();
+  }
 
   return `bls:${String(getValue(food, [
     BLS_COLUMNS.id,
@@ -211,7 +217,7 @@ function getFoodId(food) {
 }
 
 function getFoodName(food) {
-  if (food.source === "openfood") {
+  if (food.source === "openfood" || food.source === "openfood_cache") {
     const brand = food.brands ? ` · ${food.brands}` : "";
     return `${food.product_name || "OpenFood Produkt"}${brand}`;
   }
@@ -232,7 +238,7 @@ function getFoodName(food) {
 }
 
 function getFoodNutritionPer100g(food) {
-  if (food.source === "openfood") {
+  if (food.source === "openfood" || food.source === "openfood_cache") {
     return {
       calories: toNumber(food.calories),
       protein: toNumber(food.protein),
@@ -326,7 +332,17 @@ function getSearchTerms(query) {
     .filter(term => term.length >= 2);
 }
 
+/* -------------------------------------------------------
+   OpenFoodFacts API + Supabase Cache
+------------------------------------------------------- */
+
 async function getOpenFoodProductByBarcode(barcode) {
+  const cached = await getOpenFoodProductFromCacheByCode(barcode);
+
+  if (cached) {
+    return cached;
+  }
+
   const fields = [
     "code",
     "product_name",
@@ -342,7 +358,10 @@ async function getOpenFoodProductByBarcode(barcode) {
 
   if (!data || data.status !== 1 || !data.product) return null;
 
-  return normalizeOpenFoodProduct(data.product);
+  const product = normalizeOpenFoodProduct(data.product);
+  await upsertOpenFoodCache(product);
+
+  return product;
 }
 
 async function searchOpenFoodProducts(query) {
@@ -356,9 +375,13 @@ async function searchOpenFoodProducts(query) {
   const response = await fetch(url);
   const data = await response.json();
 
-  return (data.products || [])
+  const products = (data.products || [])
     .map(normalizeOpenFoodProduct)
     .filter(product => product.product_name && product.calories > 0);
+
+  await Promise.all(products.map(upsertOpenFoodCache));
+
+  return products;
 }
 
 function normalizeOpenFoodProduct(product) {
@@ -377,6 +400,90 @@ function normalizeOpenFoodProduct(product) {
     fat: toNumber(n["fat_100g"])
   };
 }
+
+function normalizeOpenFoodCacheProduct(row) {
+  return {
+    source: "openfood_cache",
+    code: row.code || "",
+    product_name: row.product_name || "Unbekanntes Produkt",
+    brands: row.brands || "",
+    quantity: row.quantity || "",
+    image_url: row.image_url || "",
+    calories: toNumber(row.calories),
+    protein: toNumber(row.protein_g),
+    carbs: toNumber(row.carbs_g),
+    fat: toNumber(row.fat_g)
+  };
+}
+
+async function upsertOpenFoodCache(product) {
+  if (!product || !product.code) return;
+
+  const { error } = await supabaseClient
+    .from(OPENFOOD_CACHE_TABLE)
+    .upsert(
+      {
+        code: product.code,
+        product_name: product.product_name || "",
+        brands: product.brands || "",
+        quantity: product.quantity || "",
+        image_url: product.image_url || "",
+        calories: toNumber(product.calories),
+        protein_g: toNumber(product.protein),
+        carbs_g: toNumber(product.carbs),
+        fat_g: toNumber(product.fat),
+        updated_at: new Date().toISOString()
+      },
+      { onConflict: "code" }
+    );
+
+  if (error) {
+    console.warn("OpenFood Cache konnte nicht gespeichert werden:", error);
+  }
+}
+
+async function getOpenFoodProductFromCacheByCode(code) {
+  const { data, error } = await supabaseClient
+    .from(OPENFOOD_CACHE_TABLE)
+    .select("*")
+    .eq("code", code)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("OpenFood Cache Barcode-Suche Fehler:", error);
+    return null;
+  }
+
+  return data ? normalizeOpenFoodCacheProduct(data) : null;
+}
+
+async function searchOpenFoodCache(query) {
+  const searchTerms = getSearchTerms(query);
+
+  if (searchTerms.length === 0) return [];
+
+  let request = supabaseClient
+    .from(OPENFOOD_CACHE_TABLE)
+    .select("*")
+    .limit(30);
+
+  searchTerms.forEach(term => {
+    request = request.or(`product_name.ilike.%${term}%,brands.ilike.%${term}%`);
+  });
+
+  const { data, error } = await request;
+
+  if (error) {
+    console.warn("OpenFood Cache Suche Fehler:", error);
+    return [];
+  }
+
+  return (data || []).map(normalizeOpenFoodCacheProduct);
+}
+
+/* -------------------------------------------------------
+   Suche
+------------------------------------------------------- */
 
 async function searchBlsFoods(query) {
   const searchTerms = getSearchTerms(query);
@@ -414,8 +521,8 @@ async function searchFoodsFromInput(value) {
   foodSearchInput.value = query;
   foodResults.innerHTML = "<p>Suche läuft...</p>";
 
-  try {
-    if (isBarcode(query)) {
+  if (isBarcode(query)) {
+    try {
       const product = await getOpenFoodProductByBarcode(query);
 
       if (!product) {
@@ -425,18 +532,52 @@ async function searchFoodsFromInput(value) {
 
       renderFoodResults([product]);
       return;
+    } catch (error) {
+      console.error("Barcode-Suche Fehler:", error);
+      foodResults.innerHTML = "<p>Barcode-Suche hat nicht geklappt.</p>";
+      return;
     }
-
-    const [blsResults, openFoodResults] = await Promise.all([
-      searchBlsFoods(query),
-      searchOpenFoodProducts(query)
-    ]);
-
-    renderFoodResults([...blsResults, ...openFoodResults]);
-  } catch (error) {
-    console.error("Fehler bei der Suche:", error);
-    foodResults.innerHTML = "<p>Suche hat nicht geklappt.</p>";
   }
+
+  const [blsResult, cacheResult, apiResult] = await Promise.allSettled([
+    searchBlsFoods(query),
+    searchOpenFoodCache(query),
+    searchOpenFoodProducts(query)
+  ]);
+
+  const blsResults = blsResult.status === "fulfilled" ? blsResult.value : [];
+  const cacheResults = cacheResult.status === "fulfilled" ? cacheResult.value : [];
+  const apiResults = apiResult.status === "fulfilled" ? apiResult.value : [];
+
+  if (apiResult.status === "rejected") {
+    console.warn("OpenFoodFacts API-Suche blockiert/fehlgeschlagen:", apiResult.reason);
+  }
+
+  const combinedResults = deduplicateFoodResults([
+    ...blsResults,
+    ...cacheResults,
+    ...apiResults
+  ]);
+
+  if (combinedResults.length === 0) {
+    foodResults.innerHTML = "<p>Keine Lebensmittel gefunden.</p>";
+    return;
+  }
+
+  renderFoodResults(combinedResults);
+}
+
+function deduplicateFoodResults(foods) {
+  const seen = new Set();
+
+  return foods.filter(food => {
+    const id = getFoodId(food);
+
+    if (!id || seen.has(id)) return false;
+
+    seen.add(id);
+    return true;
+  });
 }
 
 function sortFoodResults(foods, terms) {
@@ -472,7 +613,15 @@ function renderFoodResults(foods) {
     const div = document.createElement("div");
     div.className = "food-result";
 
-    const sourceBadge = food.source === "openfood" ? "🛒 OpenFoodFacts" : "🇩🇪 BLS";
+    let sourceBadge = "🇩🇪 BLS";
+
+    if (food.source === "openfood") {
+      sourceBadge = "🛒 OpenFoodFacts";
+    }
+
+    if (food.source === "openfood_cache") {
+      sourceBadge = "💾 OpenFood Cache";
+    }
 
     div.innerHTML = `
       <strong>${escapeHtml(getFoodName(food))}</strong>
@@ -482,7 +631,7 @@ function renderFoodResults(foods) {
         KH ${nutrition.carbs} g ·
         Fett ${nutrition.fat} g pro 100 g
       </small>
-      ${food.source === "openfood" && food.image_url ? `<img class="food-thumb" src="${food.image_url}" alt="${escapeHtml(getFoodName(food))}">` : ""}
+      ${(food.source === "openfood" || food.source === "openfood_cache") && food.image_url ? `<img class="food-thumb" src="${food.image_url}" alt="${escapeHtml(getFoodName(food))}">` : ""}
     `;
 
     div.addEventListener("click", () => selectFood(food));
@@ -650,6 +799,10 @@ async function saveSelectedFoodAsFavorite() {
     console.error(error);
     alert("Favorit konnte nicht gespeichert werden.");
     return;
+  }
+
+  if (selectedFood.source === "openfood" || selectedFood.source === "openfood_cache") {
+    await upsertOpenFoodCache(selectedFood);
   }
 
   await loadFavorites();
