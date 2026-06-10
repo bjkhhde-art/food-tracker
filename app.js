@@ -724,18 +724,16 @@ async function loadFavorites() {
 }
 
 function renderFavoriteChips() {
-  const top = favorites.slice(0, 5);
-
   favoriteChips.innerHTML = "";
   sheetFavoriteChips.innerHTML = "";
 
-  if (top.length === 0) {
+  if (favorites.length === 0) {
     favoriteChips.innerHTML = `<span class="empty-chip">Noch keine Favoriten</span>`;
     sheetFavoriteChips.innerHTML = `<span class="empty-chip">Noch keine Favoriten</span>`;
     return;
   }
 
-  top.forEach(fav => {
+  favorites.forEach(fav => {
     favoriteChips.appendChild(createFavoriteChip(fav));
     sheetFavoriteChips.appendChild(createFavoriteChip(fav));
   });
