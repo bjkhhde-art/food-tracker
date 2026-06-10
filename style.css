@@ -421,6 +421,17 @@ button {
   font-size: 17px;
 }
 
+.scanner-btn {
+  width: 100%;
+  margin: 14px 0;
+  padding: 15px 18px;
+  border-radius: 18px;
+  color: white;
+  background: linear-gradient(135deg, #111827, #16a34a);
+  box-shadow: 0 12px 24px rgba(18,148,71,0.24);
+  font-size: 17px;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -753,6 +764,61 @@ button {
   font-weight: 900;
 }
 
+.scanner-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(6px);
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.scanner-card {
+  width: min(94vw, 520px);
+  background: #f8f3ed;
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+
+.scanner-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.scanner-header h2 {
+  margin: 0 0 6px;
+}
+
+.scanner-header p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.scanner-reader {
+  overflow: hidden;
+  border-radius: 22px;
+  background: #111;
+  min-height: 280px;
+}
+
+.scanner-reader video {
+  border-radius: 22px;
+}
+
+.scanner-status {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-weight: 900;
+  text-align: center;
+}
+
 .hidden {
   display: none;
 }
@@ -824,5 +890,13 @@ hr {
 
   .sheet-favorites {
     max-height: 300px;
+  }
+
+  .scanner-card {
+    padding: 16px;
+  }
+
+  .scanner-reader {
+    min-height: 240px;
   }
 }
