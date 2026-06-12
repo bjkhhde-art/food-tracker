@@ -58,17 +58,17 @@
             </label>
 
             <label>
-              Getränketyp
-              <input id="drinkType" type="text" placeholder="z. B. Espresso, Kaffee, Milchkaffee" />
+              Getränketyp / Brühmethode
+              <input id="drinkType" type="text" placeholder="z. B. Espresso, V60, French Press" />
             </label>
 
             <label>
-              Eigenes Getränk / Name
-              <input id="customDrinkName" type="text" placeholder="z. B. Flat White" />
+              Eigenes Getränk / Bohne
+              <input id="customDrinkName" type="text" placeholder="z. B. Pano Sipeo Espresso" />
             </label>
 
             <label>
-              Emoji
+              Icon / Emoji
               <input id="drinkEmoji" type="text" maxlength="2" placeholder="☕" />
             </label>
 
@@ -173,45 +173,68 @@
         <article class="panel">
           <div class="panel-head">
             <div>
-              <h2>Wochenübersicht</h2>
-              <p>Koffein pro Tag</p>
+              <h2>Koffein / Woche</h2>
+              <p>Tagessummen mit Wochendurchschnitt</p>
             </div>
             <span id="weekCompare" class="badge">–</span>
           </div>
-          <div id="weekChart" class="bar-chart"></div>
+          <canvas id="weekCanvas" class="chart-canvas" height="260"></canvas>
         </article>
 
         <article class="panel">
           <div class="panel-head">
             <div>
-              <h2>Monatsübersicht</h2>
-              <p>Kalenderansicht</p>
+              <h2>Konsum-Trend</h2>
+              <p>Entwicklung der letzten 30 Tage</p>
             </div>
-            <span class="badge">Monat</span>
+            <span id="trendBadge" class="badge">–</span>
           </div>
-          <div id="monthCalendar" class="month-grid"></div>
+          <canvas id="trendCanvas" class="chart-canvas" height="260"></canvas>
         </article>
 
         <article class="panel">
           <div class="panel-head">
             <div>
-              <h2>Uhrzeit-Muster</h2>
-              <p>Wann trinkst du am meisten?</p>
-            </div>
-            <span id="peakHour" class="badge">–</span>
-          </div>
-          <div id="hourChart" class="hour-chart"></div>
-        </article>
-
-        <article class="panel">
-          <div class="panel-head">
-            <div>
-              <h2>Meistgetrunken</h2>
-              <p>Basierend auf deinen Einträgen</p>
+              <h2>Lieblingsbohnen</h2>
+              <p>Ranking nach Häufigkeit</p>
             </div>
             <span class="badge">Top</span>
           </div>
-          <p id="topDrink" class="big-info">Noch keine Daten</p>
+          <div id="beanRanking" class="ranking-list"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Beste Bewertungen</h2>
+              <p>Top 5 Einträge</p>
+            </div>
+            <span class="badge">Rating</span>
+          </div>
+          <div id="topRatings" class="ranking-list"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Brühmethoden</h2>
+              <p>Verteilung nach Getränketyp</p>
+            </div>
+            <span class="badge">Mix</span>
+          </div>
+          <canvas id="methodCanvas" class="chart-canvas small" height="220"></canvas>
+          <div id="methodBars" class="method-bars"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Peak-Zeiten</h2>
+              <p>Heatmap nach Tag und Uhrzeit</p>
+            </div>
+            <span id="peakHour" class="badge">–</span>
+          </div>
+          <div id="heatmap" class="heatmap"></div>
         </article>
       </div>
     </section>
@@ -221,7 +244,7 @@
         <div class="panel-head">
           <div>
             <h2>Verlauf</h2>
-            <p>Neueste Einträge zuerst, gruppiert nach Tagen.</p>
+            <p>Kompakte Liste, neueste Einträge zuerst. Mobil: rechts wischen = bearbeiten, links wischen = löschen.</p>
           </div>
           <span id="entriesCount" class="badge">0 Einträge</span>
         </div>
@@ -314,6 +337,10 @@
       </article>
     </section>
   </main>
+
+  <button id="fabAdd" class="fab" type="button" aria-label="Neuen Eintrag hinzufügen">
+    +
+  </button>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
