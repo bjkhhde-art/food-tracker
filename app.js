@@ -1,6 +1,6 @@
 /* ============================================================
    Coffee Tracker – GitHub Pages + Supabase
-   Getränke, Koffein, Mahlgrad, Shot-Daten, Verlauf, Statistiken
+   Getränke, Koffein, Mahlgrad, Shot-Daten, Equipment, Statistiken
    ============================================================ */
 
 
@@ -17,6 +17,7 @@ const TABLE_ENTRIES = "coffee_entries";
 const TABLE_DRINKS = "coffee_drinks";
 const TABLE_SETTINGS = "coffee_user_settings";
 const TABLE_GRINDER = "coffee_grinder_settings";
+const TABLE_EQUIPMENT = "coffee_equipment";
 
 const supabaseClient = window.supabase
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
@@ -44,11 +45,13 @@ const state = {
   entries: [],
   drinks: [],
   grinderSettings: [],
+  equipment: [],
   settings: {
     caffeine_limit_mg: 400,
     unit: "ml",
   },
   editingId: null,
+  editingEquipmentId: null,
   filters: {
     date: "",
     drink: "",
@@ -124,6 +127,23 @@ const el = {
   grinderSearch: $("grinderSearch"),
   grinderTable: $("grinderTable"),
   grinderCount: $("grinderCount"),
+
+  equipmentForm: $("equipmentForm"),
+  equipmentCategory: $("equipmentCategory"),
+  equipmentName: $("equipmentName"),
+  equipmentBrand: $("equipmentBrand"),
+  equipmentModel: $("equipmentModel"),
+  equipmentPurchaseDate: $("equipmentPurchaseDate"),
+  equipmentPrice: $("equipmentPrice"),
+  equipmentFacts: $("equipmentFacts"),
+  equipmentNotes: $("equipmentNotes"),
+  equipmentActive: $("equipmentActive"),
+  equipmentMessage: $("equipmentMessage"),
+  equipmentCount: $("equipmentCount"),
+  equipmentList: $("equipmentList"),
+  saveEquipmentBtn: $("saveEquipmentBtn"),
+  cancelEquipmentEditBtn: $("cancelEquipmentEditBtn"),
+  resetEquipmentBtn: $("resetEquipmentBtn"),
 
   limitInput: $("limitInput"),
   unitSelect: $("unitSelect"),
@@ -204,9 +224,14 @@ function setSettingsMessage(message, type = "info") {
   el.settingsMessage.style.color = type === "error" ? "var(--danger)" : "var(--accent-light)";
 }
 
+function setEquipmentMessage(message, type = "info") {
+  if (!el.equipmentMessage) return;
+  el.equipmentMessage.textContent = message || "";
+  el.equipmentMessage.style.color = type === "error" ? "var(--danger)" : "var(--accent-light)";
+}
+
 function setButtonLoading(button, isLoading, loadingText, defaultText) {
   if (!button) return;
-
   button.disabled = isLoading;
   button.textContent = isLoading ? loadingText : defaultText;
 }
@@ -227,6 +252,16 @@ function formatDateHeader(date) {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
+  });
+}
+
+function formatDateShort(date) {
+  if (!date) return "–";
+
+  return new Date(`${date}T00:00:00`).toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
   });
 }
 
@@ -300,6 +335,19 @@ function getRoastClass(roast) {
   return "roast-unknown";
 }
 
+function getEquipmentIcon(category) {
+  const text = normalize(category);
+
+  if (text.includes("maschine")) return "☕";
+  if (text.includes("muhle")) return "⚙️";
+  if (text.includes("sieb")) return "🧺";
+  if (text.includes("waage")) return "⚖️";
+  if (text.includes("tamper")) return "⬇️";
+  if (text.includes("zubehor")) return "🧰";
+
+  return "🔧";
+}
+
 function sumCaffeine(entries) {
   return entries.reduce((sum, entry) => sum + (Number(entry.caffeine_mg) || 0), 0);
 }
@@ -347,6 +395,10 @@ async function init() {
 function initFormDefaults() {
   el.entryDate.value = todayISO();
   el.entryTime.value = nowTime();
+
+  if (el.equipmentCategory) {
+    el.equipmentCategory.value = "Maschine";
+  }
 }
 
 function initTabs() {
@@ -378,6 +430,7 @@ function openView(viewName) {
   if (viewName === "dashboard") renderDashboard();
   if (viewName === "history") renderEntries();
   if (viewName === "grinder") renderGrinderSettings();
+  if (viewName === "equipment") renderEquipment();
 }
 
 
@@ -417,6 +470,13 @@ function renderSkeletons() {
       <tr><td colspan="8"><div class="skeleton skeleton-card"></div></td></tr>
     `;
   }
+
+  if (el.equipmentList) {
+    el.equipmentList.innerHTML = `
+      <div class="skeleton skeleton-card"></div>
+      <div class="skeleton skeleton-card"></div>
+    `;
+  }
 }
 
 
@@ -433,6 +493,7 @@ async function reloadAll() {
     loadDrinks(),
     loadEntries(),
     loadGrinderSettings(),
+    loadEquipment(),
   ]);
 
   state.isLoading = false;
@@ -517,6 +578,22 @@ async function loadGrinderSettings() {
   state.grinderSettings = data || [];
 }
 
+async function loadEquipment() {
+  const { data, error } = await supabaseClient
+    .from(TABLE_EQUIPMENT)
+    .select("*")
+    .order("category", { ascending: true })
+    .order("name", { ascending: true });
+
+  if (error) {
+    console.error("Equipment konnte nicht geladen werden:", error);
+    state.equipment = [];
+    return;
+  }
+
+  state.equipment = data || [];
+}
+
 
 /* ============================================================
    8. EVENTS
@@ -567,6 +644,10 @@ function initEvents() {
     renderGrinderSettings();
   });
 
+  el.equipmentForm.addEventListener("submit", saveEquipment);
+  el.resetEquipmentBtn.addEventListener("click", resetEquipmentForm);
+  el.cancelEquipmentEditBtn.addEventListener("click", resetEquipmentForm);
+
   el.saveSettingsBtn.addEventListener("click", saveSettings);
 
   el.fabAdd.addEventListener("click", () => {
@@ -594,6 +675,7 @@ function renderAll() {
   renderDashboard();
   renderEntries();
   renderGrinderSettings();
+  renderEquipment();
 }
 
 
@@ -1667,7 +1749,211 @@ function applyGrinderSetting(item) {
 
 
 /* ============================================================
-   16. SETTINGS
+   16. EQUIPMENT
+   ============================================================ */
+
+function readEquipmentForm() {
+  return {
+    category: el.equipmentCategory.value || "Sonstiges",
+    name: el.equipmentName.value.trim(),
+    brand: el.equipmentBrand.value.trim() || null,
+    model: el.equipmentModel.value.trim() || null,
+    purchase_date: el.equipmentPurchaseDate.value || null,
+    price_eur: toNumber(el.equipmentPrice.value),
+    facts: el.equipmentFacts.value.trim() || null,
+    notes: el.equipmentNotes.value.trim() || null,
+    is_active: Boolean(el.equipmentActive.checked),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+async function saveEquipment(event) {
+  event.preventDefault();
+
+  const payload = readEquipmentForm();
+
+  if (!payload.name) {
+    setEquipmentMessage("Bitte mindestens einen Namen eintragen.", "error");
+    return;
+  }
+
+  const isEditing = Boolean(state.editingEquipmentId);
+  const defaultText = isEditing ? "Änderung speichern" : "Equipment speichern";
+
+  setButtonLoading(el.saveEquipmentBtn, true, "Speichere ...", defaultText);
+
+  let response;
+
+  if (isEditing) {
+    response = await supabaseClient
+      .from(TABLE_EQUIPMENT)
+      .update(payload)
+      .eq("id", state.editingEquipmentId)
+      .select()
+      .single();
+  } else {
+    response = await supabaseClient
+      .from(TABLE_EQUIPMENT)
+      .insert(payload)
+      .select()
+      .single();
+  }
+
+  setButtonLoading(el.saveEquipmentBtn, false, "Speichere ...", defaultText);
+
+  if (response.error) {
+    console.error("Equipment konnte nicht gespeichert werden:", response.error);
+    setEquipmentMessage(`Speichern fehlgeschlagen: ${response.error.message}`, "error");
+    return;
+  }
+
+  showToast(isEditing ? "Equipment aktualisiert." : "Equipment gespeichert.");
+  resetEquipmentForm();
+
+  await loadEquipment();
+  renderEquipment();
+}
+
+function renderEquipment() {
+  if (!el.equipmentList || !el.equipmentCount) return;
+
+  el.equipmentCount.textContent = `${state.equipment.length} Geräte`;
+  el.equipmentList.innerHTML = "";
+
+  if (!state.equipment.length) {
+    el.equipmentList.innerHTML = `<div class="empty">Noch kein Equipment hinterlegt.</div>`;
+    return;
+  }
+
+  const grouped = new Map();
+
+  state.equipment.forEach((item) => {
+    const category = item.category || "Sonstiges";
+
+    if (!grouped.has(category)) {
+      grouped.set(category, []);
+    }
+
+    grouped.get(category).push(item);
+  });
+
+  grouped.forEach((items, category) => {
+    const group = document.createElement("section");
+    group.className = "equipment-group";
+
+    group.innerHTML = `
+      <div class="day-head">
+        <h3>${escapeHTML(getEquipmentIcon(category))} ${escapeHTML(category)}</h3>
+        <span>${items.length}</span>
+      </div>
+    `;
+
+    items.forEach((item) => {
+      const card = document.createElement("article");
+      card.className = `equipment-card ${item.is_active ? "active-equipment" : "inactive-equipment"}`;
+
+      card.innerHTML = `
+        <div class="equipment-main">
+          <div class="equipment-icon">${escapeHTML(getEquipmentIcon(item.category))}</div>
+
+          <div class="equipment-content">
+            <div class="equipment-title-row">
+              <strong>${escapeHTML(item.name)}</strong>
+              <span>${item.is_active ? "Aktiv" : "Inaktiv"}</span>
+            </div>
+
+            <div class="entry-meta compact-meta">
+              ${item.brand ? `<span>${escapeHTML(item.brand)}</span>` : ""}
+              ${item.model ? `<span>${escapeHTML(item.model)}</span>` : ""}
+              ${item.purchase_date ? `<span>Gekauft: ${formatDateShort(item.purchase_date)}</span>` : ""}
+              ${item.price_eur !== null && item.price_eur !== undefined ? `<span>${formatNumber(item.price_eur, 2)} €</span>` : ""}
+            </div>
+
+            ${item.facts ? `<p><strong>Fakten:</strong> ${escapeHTML(item.facts)}</p>` : ""}
+            ${item.notes ? `<p><strong>Notiz:</strong> ${escapeHTML(item.notes)}</p>` : ""}
+          </div>
+        </div>
+
+        <button class="delete-equipment" type="button" aria-label="Equipment löschen">×</button>
+      `;
+
+      card.addEventListener("click", () => startEditEquipment(item));
+
+      card.querySelector(".delete-equipment").addEventListener("click", async (event) => {
+        event.stopPropagation();
+        await deleteEquipment(item.id);
+      });
+
+      group.appendChild(card);
+    });
+
+    el.equipmentList.appendChild(group);
+  });
+}
+
+function startEditEquipment(item) {
+  state.editingEquipmentId = item.id;
+
+  el.equipmentCategory.value = item.category || "Sonstiges";
+  el.equipmentName.value = item.name || "";
+  el.equipmentBrand.value = item.brand || "";
+  el.equipmentModel.value = item.model || "";
+  el.equipmentPurchaseDate.value = item.purchase_date || "";
+  el.equipmentPrice.value = item.price_eur ?? "";
+  el.equipmentFacts.value = item.facts || "";
+  el.equipmentNotes.value = item.notes || "";
+  el.equipmentActive.checked = Boolean(item.is_active);
+
+  el.saveEquipmentBtn.textContent = "Änderung speichern";
+  el.cancelEquipmentEditBtn.classList.remove("hidden");
+
+  setEquipmentMessage("Du bearbeitest gerade ein Equipment.");
+  openView("equipment");
+}
+
+function resetEquipmentForm() {
+  state.editingEquipmentId = null;
+
+  el.equipmentCategory.value = "Maschine";
+  el.equipmentName.value = "";
+  el.equipmentBrand.value = "";
+  el.equipmentModel.value = "";
+  el.equipmentPurchaseDate.value = "";
+  el.equipmentPrice.value = "";
+  el.equipmentFacts.value = "";
+  el.equipmentNotes.value = "";
+  el.equipmentActive.checked = true;
+
+  el.saveEquipmentBtn.textContent = "Equipment speichern";
+  el.cancelEquipmentEditBtn.classList.add("hidden");
+
+  setEquipmentMessage("");
+}
+
+async function deleteEquipment(id) {
+  const confirmed = window.confirm("Dieses Equipment wirklich löschen?");
+  if (!confirmed) return;
+
+  const { error } = await supabaseClient
+    .from(TABLE_EQUIPMENT)
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("Equipment konnte nicht gelöscht werden:", error);
+    showToast("Löschen fehlgeschlagen.");
+    return;
+  }
+
+  showToast("Equipment gelöscht.");
+
+  await loadEquipment();
+  renderEquipment();
+}
+
+
+/* ============================================================
+   17. SETTINGS
    ============================================================ */
 
 async function saveSettings() {
