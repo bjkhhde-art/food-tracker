@@ -224,6 +224,25 @@
       <button id="closeProfileBtn" class="icon-btn">×</button>
     </div>
 
+    <details class="device-settings" open>
+      <summary>Geräte-Verknüpfung</summary>
+
+      <div class="device-id-box">
+        <span>Dieses Gerät</span>
+        <code id="deviceUserIdText">Wird geladen...</code>
+      </div>
+
+      <div class="device-id-box">
+        <span>Aktive User-ID</span>
+        <code id="activeUserIdText">Wird geladen...</code>
+      </div>
+
+      <p>
+        Trage die Geräte-ID in Supabase bei <strong>user_aliases</strong> ein.
+        Die <strong>main_user_id</strong> ist die gemeinsame ID, z. B. vom Laptop.
+      </p>
+    </details>
+
     <div class="form-grid drawer-grid">
       <div>
         <label>Tägliches Kalorienziel</label>
