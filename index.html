@@ -20,7 +20,7 @@
         <div>
           <p class="eyebrow">Kaffee • Koffein • Mahlgrad</p>
           <h1>Coffee Tracker</h1>
-          <p class="subline">Tracke Getränke, Koffein, Shots, Mahlgrad und Geschmack.</p>
+          <p class="subline">Tracke Getränke, Koffein, Shots, Mahlgrad, Equipment und Geschmack.</p>
         </div>
       </div>
 
@@ -34,6 +34,7 @@
       <button class="tab" data-view="dashboard" type="button">Übersicht</button>
       <button class="tab" data-view="history" type="button">Verlauf</button>
       <button class="tab" data-view="grinder" type="button">Mahlgrade</button>
+      <button class="tab" data-view="equipment" type="button">Equipment</button>
       <button class="tab" data-view="settings" type="button">Einstellungen</button>
     </nav>
 
@@ -301,6 +302,95 @@
             <tbody id="grinderTable"></tbody>
           </table>
         </div>
+      </article>
+    </section>
+
+    <section id="view-equipment" class="view">
+      <article class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Equipment</h2>
+            <p>Hinterlege Kaffeemaschine, Mühle, Zubehör, Kaufdatum und technische Fakten.</p>
+          </div>
+          <span id="equipmentCount" class="badge">0 Geräte</span>
+        </div>
+
+        <form id="equipmentForm" novalidate>
+          <div class="form-grid">
+            <label>
+              Kategorie
+              <select id="equipmentCategory">
+                <option value="Maschine">Maschine</option>
+                <option value="Mühle">Mühle</option>
+                <option value="Siebträger">Siebträger</option>
+                <option value="Waage">Waage</option>
+                <option value="Tamper">Tamper</option>
+                <option value="Zubehör">Zubehör</option>
+                <option value="Sonstiges">Sonstiges</option>
+              </select>
+            </label>
+
+            <label>
+              Name
+              <input id="equipmentName" type="text" placeholder="z. B. Lelit Mara X" />
+            </label>
+
+            <label>
+              Hersteller
+              <input id="equipmentBrand" type="text" placeholder="z. B. Lelit" />
+            </label>
+
+            <label>
+              Modell
+              <input id="equipmentModel" type="text" placeholder="z. B. PL62X" />
+            </label>
+
+            <label>
+              Kaufdatum
+              <input id="equipmentPurchaseDate" type="date" />
+            </label>
+
+            <label>
+              Preis in €
+              <input id="equipmentPrice" type="number" inputmode="decimal" step="0.01" placeholder="z. B. 999" />
+            </label>
+
+            <label class="full">
+              Fakten / technische Daten
+              <textarea id="equipmentFacts" rows="4" placeholder="z. B. E61 Brühgruppe, Vibrationspumpe, PID, 58mm Siebträger ..."></textarea>
+            </label>
+
+            <label class="full">
+              Notizen
+              <textarea id="equipmentNotes" rows="3" placeholder="z. B. gekauft gebraucht, Wartung, Dichtung gewechselt ..."></textarea>
+            </label>
+
+            <label class="checkbox-label full">
+              <input id="equipmentActive" type="checkbox" checked />
+              Aktiv / aktuell in Benutzung
+            </label>
+          </div>
+
+          <p id="equipmentMessage" class="message"></p>
+
+          <div class="actions">
+            <button id="saveEquipmentBtn" class="primary" type="submit">Equipment speichern</button>
+            <button id="cancelEquipmentEditBtn" class="ghost hidden" type="button">Bearbeiten abbrechen</button>
+            <button id="resetEquipmentBtn" class="ghost" type="button">Formular leeren</button>
+          </div>
+        </form>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Meine Ausstattung</h2>
+            <p>Klick auf einen Eintrag zum Bearbeiten.</p>
+          </div>
+          <span class="badge">Setup</span>
+        </div>
+
+        <div id="equipmentList" class="equipment-list"></div>
       </article>
     </section>
 
