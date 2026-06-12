@@ -40,7 +40,8 @@ function getOrCreateUserId() {
   return userId;
 }
 
-const currentUserId = getOrCreateUserId();
+const deviceUserId = getOrCreateUserId();
+let currentUserId = deviceUserId;
 
 const $ = id => document.getElementById(id);
 
@@ -134,8 +135,10 @@ const navAddBtn = $("navAddBtn");
 const scanBarcodeBtn = $("scanBarcodeBtn");
 const scannerOverlay = $("scannerOverlay");
 const closeScannerBtn = $("closeScannerBtn");
-const scannerReader = $("scannerReader");
 const scannerStatus = $("scannerStatus");
+
+const deviceUserIdText = $("deviceUserIdText");
+const activeUserIdText = $("activeUserIdText");
 
 let selectedFood = null;
 let profile = null;
@@ -153,9 +156,50 @@ function initDefaults() {
   dashboardDateInput.value = toDateInput(today);
 
   updateHeaderDate();
+  updateUserIdDisplay();
 
   foodSearchInput.placeholder = "BLS, OpenFood-Cache oder Barcode suchen";
   inlineFoodSearchInput.placeholder = "Lebensmittel oder Barcode suchen";
+}
+
+function updateUserIdDisplay() {
+  if (deviceUserIdText) deviceUserIdText.textContent = deviceUserId;
+  if (activeUserIdText) activeUserIdText.textContent = currentUserId;
+
+  window.foodTrackerIds = {
+    deviceUserId,
+    currentUserId
+  };
+}
+
+async function resolveCurrentUserId() {
+  currentUserId = deviceUserId;
+
+  try {
+    const { data, error } = await supabaseClient
+      .from("user_aliases")
+      .select("main_user_id")
+      .eq("cookie_user_id", deviceUserId)
+      .maybeSingle();
+
+    if (error) {
+      console.warn("User-Verknüpfung konnte nicht geladen werden. App nutzt Geräte-ID:", error);
+      updateUserIdDisplay();
+      return;
+    }
+
+    if (data?.main_user_id) {
+      currentUserId = data.main_user_id;
+    }
+
+    console.log("Geräte-ID:", deviceUserId);
+    console.log("Aktive User-ID:", currentUserId);
+
+    updateUserIdDisplay();
+  } catch (error) {
+    console.warn("User-Verknüpfung Fehler. App nutzt Geräte-ID:", error);
+    updateUserIdDisplay();
+  }
 }
 
 function toLocalDateTimeInput(date) {
@@ -1507,6 +1551,7 @@ function closeAddSheet() {
 function openProfileDrawer() {
   profileDrawer.classList.remove("hidden");
   sheetOverlay.classList.remove("hidden");
+  updateUserIdDisplay();
 }
 
 function closeProfileDrawer() {
@@ -1599,6 +1644,9 @@ scannerOverlay.addEventListener("click", event => {
 
 async function initApp() {
   initDefaults();
+
+  await resolveCurrentUserId();
+
   await loadProfile();
   await loadFavorites();
   await loadDashboard();
