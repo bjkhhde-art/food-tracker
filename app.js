@@ -136,6 +136,8 @@ const scanBarcodeBtn = $("scanBarcodeBtn");
 const scannerOverlay = $("scannerOverlay");
 const closeScannerBtn = $("closeScannerBtn");
 const scannerStatus = $("scannerStatus");
+const scanPhotoBtn = $("scanPhotoBtn");
+const barcodeImageInput = $("barcodeImageInput");
 
 const deviceUserIdText = $("deviceUserIdText");
 const activeUserIdText = $("activeUserIdText");
@@ -876,6 +878,31 @@ async function deleteFavorite(foodId) {
    Barcode Scanner
 ------------------------------------------------------- */
 
+function getScannerFormats() {
+  if (!window.Html5QrcodeSupportedFormats) return undefined;
+
+  return [
+    Html5QrcodeSupportedFormats.EAN_13,
+    Html5QrcodeSupportedFormats.EAN_8,
+    Html5QrcodeSupportedFormats.UPC_A,
+    Html5QrcodeSupportedFormats.UPC_E,
+    Html5QrcodeSupportedFormats.CODE_128,
+    Html5QrcodeSupportedFormats.CODE_39,
+    Html5QrcodeSupportedFormats.QR_CODE
+  ];
+}
+
+function createScannerInstance() {
+  const config = {};
+  const formatsToSupport = getScannerFormats();
+
+  if (formatsToSupport) {
+    config.formatsToSupport = formatsToSupport;
+  }
+
+  return new Html5Qrcode("scannerReader", config);
+}
+
 async function openScanner() {
   scannerOverlay.classList.remove("hidden");
   scannerStatus.textContent = "Kamera wird gestartet...";
@@ -891,7 +918,7 @@ async function startBarcodeScanner() {
     }
 
     if (!html5QrCode) {
-      html5QrCode = new Html5Qrcode("scannerReader");
+      html5QrCode = createScannerInstance();
     }
 
     const scannerConfig = {
@@ -902,18 +929,6 @@ async function startBarcodeScanner() {
       },
       aspectRatio: 1.777
     };
-
-    if (window.Html5QrcodeSupportedFormats) {
-      scannerConfig.formatsToSupport = [
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.UPC_E,
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.QR_CODE
-      ];
-    }
 
     await html5QrCode.start(
       { facingMode: "environment" },
@@ -926,7 +941,7 @@ async function startBarcodeScanner() {
     scannerStatus.textContent = "Scanner läuft. Barcode bitte mittig ausrichten.";
   } catch (error) {
     console.error("Scanner Fehler:", error);
-    scannerStatus.textContent = "Kamera konnte nicht gestartet werden. Prüfe die Browser-Berechtigung.";
+    scannerStatus.textContent = "Kamera konnte nicht gestartet werden. Nutze alternativ den Foto-Button.";
   }
 }
 
@@ -937,6 +952,48 @@ async function onScanSuccess(decodedText) {
 
   scannerStatus.textContent = `Erkannt: ${scannedValue}`;
 
+  await handleScannedCode(scannedValue);
+}
+
+async function scanBarcodeFromImage(file) {
+  if (!file) {
+    scannerStatus.textContent = "Kein Bild ausgewählt.";
+    return;
+  }
+
+  try {
+    scannerOverlay.classList.remove("hidden");
+    scannerStatus.textContent = "Foto wird ausgewertet...";
+
+    await stopBarcodeScanner();
+
+    if (!window.Html5Qrcode) {
+      scannerStatus.textContent = "Scanner-Bibliothek konnte nicht geladen werden.";
+      return;
+    }
+
+    html5QrCode = createScannerInstance();
+
+    const decodedText = await html5QrCode.scanFile(file, true);
+    const scannedValue = String(decodedText || "").trim();
+
+    if (!scannedValue) {
+      scannerStatus.textContent = "Auf dem Foto wurde kein Code erkannt.";
+      return;
+    }
+
+    scannerStatus.textContent = `Erkannt: ${scannedValue}`;
+
+    await handleScannedCode(scannedValue);
+  } catch (error) {
+    console.error("Foto-Scan Fehler:", error);
+    scannerStatus.textContent = "Auf dem Foto wurde kein Barcode/QR-Code erkannt. Versuch es näher, heller und schärfer.";
+  } finally {
+    barcodeImageInput.value = "";
+  }
+}
+
+async function handleScannedCode(scannedValue) {
   await closeScanner();
 
   foodSearchInput.value = scannedValue;
@@ -944,8 +1001,8 @@ async function onScanSuccess(decodedText) {
   if (isBarcode(scannedValue)) {
     await searchFoodsFromInput(scannedValue);
   } else {
-    foodResults.innerHTML = `<p>Code erkannt, aber kein gültiger Lebensmittel-Barcode: ${escapeHtml(scannedValue)}</p>`;
     openAddSheet();
+    foodResults.innerHTML = `<p>Code erkannt, aber kein gültiger Lebensmittel-Barcode: ${escapeHtml(scannedValue)}</p>`;
   }
 }
 
@@ -1640,6 +1697,17 @@ scannerOverlay.addEventListener("click", event => {
   if (event.target === scannerOverlay) {
     closeScanner();
   }
+});
+
+scanPhotoBtn.addEventListener("click", async () => {
+  scannerStatus.textContent = "Foto auswählen...";
+  await stopBarcodeScanner();
+  barcodeImageInput.click();
+});
+
+barcodeImageInput.addEventListener("change", async event => {
+  const file = event.target.files?.[0];
+  await scanBarcodeFromImage(file);
 });
 
 async function initApp() {
