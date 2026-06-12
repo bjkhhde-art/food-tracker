@@ -33,11 +33,14 @@ const DEFAULT_DRINKS = [
   { name: "Kaffee", drink_type: "Kaffee", emoji: "☕", default_amount_ml: 200, default_caffeine_mg: 95 },
   { name: "Cappuccino", drink_type: "Milchkaffee", emoji: "🥛", default_amount_ml: 180, default_caffeine_mg: 80 },
   { name: "Latte Macchiato", drink_type: "Milchkaffee", emoji: "🥛", default_amount_ml: 250, default_caffeine_mg: 80 },
+  { name: "V60", drink_type: "V60", emoji: "🔻", default_amount_ml: 250, default_caffeine_mg: 120 },
+  { name: "French Press", drink_type: "French Press", emoji: "🫙", default_amount_ml: 250, default_caffeine_mg: 110 },
   { name: "Cold Brew", drink_type: "Cold Brew", emoji: "🧊", default_amount_ml: 250, default_caffeine_mg: 150 },
   { name: "Entkoffeiniert", drink_type: "Entkoffeiniert", emoji: "🌙", default_amount_ml: 200, default_caffeine_mg: 5 },
 ];
 
 const state = {
+  isLoading: true,
   entries: [],
   drinks: [],
   grinderSettings: [],
@@ -63,6 +66,7 @@ const $ = (id) => document.getElementById(id);
 const el = {
   tabs: $("tabs"),
   navToggle: $("navToggle"),
+  fabAdd: $("fabAdd"),
 
   drinkSelect: $("drinkSelect"),
   quickFavorites: $("quickFavorites"),
@@ -98,12 +102,17 @@ const el = {
   avgDaily: $("avgDaily"),
   limitText: $("limitText"),
   overLimitHint: $("overLimitHint"),
-  weekChart: $("weekChart"),
-  monthCalendar: $("monthCalendar"),
+
+  weekCanvas: $("weekCanvas"),
   weekCompare: $("weekCompare"),
-  topDrink: $("topDrink"),
+  trendCanvas: $("trendCanvas"),
+  trendBadge: $("trendBadge"),
+  beanRanking: $("beanRanking"),
+  topRatings: $("topRatings"),
+  methodCanvas: $("methodCanvas"),
+  methodBars: $("methodBars"),
   peakHour: $("peakHour"),
-  hourChart: $("hourChart"),
+  heatmap: $("heatmap"),
 
   filterDate: $("filterDate"),
   filterDrink: $("filterDrink"),
@@ -184,11 +193,13 @@ function showToast(message) {
 }
 
 function setFormMessage(message, type = "info") {
+  if (!el.formMessage) return;
   el.formMessage.textContent = message || "";
   el.formMessage.style.color = type === "error" ? "var(--danger)" : "var(--accent-light)";
 }
 
 function setSettingsMessage(message, type = "info") {
+  if (!el.settingsMessage) return;
   el.settingsMessage.textContent = message || "";
   el.settingsMessage.style.color = type === "error" ? "var(--danger)" : "var(--accent-light)";
 }
@@ -198,10 +209,6 @@ function setButtonLoading(button, isLoading, loadingText, defaultText) {
 
   button.disabled = isLoading;
   button.textContent = isLoading ? loadingText : defaultText;
-}
-
-function dateKey(date) {
-  return new Date(`${date}T00:00:00`).toISOString().slice(0, 10);
 }
 
 function formatDateHeader(date) {
@@ -252,6 +259,58 @@ function getPreviousNDays(count, offset) {
   return days;
 }
 
+function getMethodIcon(entryOrType) {
+  const text = normalize(
+    typeof entryOrType === "string"
+      ? entryOrType
+      : `${entryOrType.drink_type || ""} ${entryOrType.drink_name || ""}`
+  );
+
+  if (text.includes("espresso")) return "☕";
+  if (text.includes("v60")) return "🔻";
+  if (text.includes("filter")) return "🔻";
+  if (text.includes("french")) return "🫙";
+  if (text.includes("cold")) return "🧊";
+  if (text.includes("cappuccino")) return "🥛";
+  if (text.includes("latte")) return "🥛";
+  if (text.includes("entkoff")) return "🌙";
+  return "☕";
+}
+
+function getMethodName(entry) {
+  return entry.drink_type || entry.drink_name || "Unbekannt";
+}
+
+function getRatingClass(rating) {
+  const n = Number(rating);
+
+  if (!Number.isFinite(n)) return "rating-none";
+  if (n >= 4) return "rating-good";
+  if (n >= 3) return "rating-mid";
+  return "rating-bad";
+}
+
+function getRoastClass(roast) {
+  const text = normalize(roast);
+
+  if (text.includes("light") || text.includes("hell")) return "roast-light";
+  if (text.includes("medium")) return "roast-medium";
+  if (text.includes("dark") || text.includes("dunkel")) return "roast-dark";
+
+  return "roast-unknown";
+}
+
+function sumCaffeine(entries) {
+  return entries.reduce((sum, entry) => sum + (Number(entry.caffeine_mg) || 0), 0);
+}
+
+function sumCaffeineForDays(days) {
+  return days.reduce((sum, day) => {
+    const entries = state.entries.filter((entry) => entry.entry_date === day);
+    return sum + sumCaffeine(entries);
+  }, 0);
+}
+
 
 /* ============================================================
    5. INIT
@@ -261,6 +320,7 @@ async function init() {
   initTabs();
   initFormDefaults();
   initEvents();
+  renderSkeletons();
 
   if (!supabaseClient) {
     showToast("Supabase konnte nicht geladen werden.");
@@ -292,8 +352,7 @@ function initFormDefaults() {
 function initTabs() {
   document.querySelectorAll(".tab").forEach((tab) => {
     tab.addEventListener("click", () => {
-      const viewName = tab.dataset.view;
-      openView(viewName);
+      openView(tab.dataset.view);
     });
   });
 
@@ -323,10 +382,52 @@ function openView(viewName) {
 
 
 /* ============================================================
-   6. SUPABASE LOAD
+   6. SKELETON LOADING
+   ============================================================ */
+
+function renderSkeletons() {
+  if (el.entriesList) {
+    el.entriesList.innerHTML = `
+      <div class="skeleton skeleton-line"></div>
+      <div class="skeleton skeleton-card"></div>
+      <div class="skeleton skeleton-card"></div>
+      <div class="skeleton skeleton-card"></div>
+    `;
+  }
+
+  if (el.beanRanking) {
+    el.beanRanking.innerHTML = `
+      <div class="skeleton skeleton-list"></div>
+      <div class="skeleton skeleton-list"></div>
+      <div class="skeleton skeleton-list"></div>
+    `;
+  }
+
+  if (el.topRatings) {
+    el.topRatings.innerHTML = `
+      <div class="skeleton skeleton-list"></div>
+      <div class="skeleton skeleton-list"></div>
+      <div class="skeleton skeleton-list"></div>
+    `;
+  }
+
+  if (el.grinderTable) {
+    el.grinderTable.innerHTML = `
+      <tr><td colspan="8"><div class="skeleton skeleton-card"></div></td></tr>
+      <tr><td colspan="8"><div class="skeleton skeleton-card"></div></td></tr>
+    `;
+  }
+}
+
+
+/* ============================================================
+   7. SUPABASE LOAD
    ============================================================ */
 
 async function reloadAll() {
+  state.isLoading = true;
+  renderSkeletons();
+
   await Promise.all([
     loadSettings(),
     loadDrinks(),
@@ -334,6 +435,7 @@ async function reloadAll() {
     loadGrinderSettings(),
   ]);
 
+  state.isLoading = false;
   renderAll();
 }
 
@@ -417,7 +519,7 @@ async function loadGrinderSettings() {
 
 
 /* ============================================================
-   7. EVENTS
+   8. EVENTS
    ============================================================ */
 
 function initEvents() {
@@ -432,11 +534,7 @@ function initEvents() {
     validateEntryForm(false);
   });
 
-  [
-    el.customDrinkName,
-    el.amountMl,
-    el.caffeineMg,
-  ].forEach((input) => {
+  [el.customDrinkName, el.amountMl, el.caffeineMg].forEach((input) => {
     input.addEventListener("input", () => validateEntryForm(false));
   });
 
@@ -470,11 +568,23 @@ function initEvents() {
   });
 
   el.saveSettingsBtn.addEventListener("click", saveSettings);
+
+  el.fabAdd.addEventListener("click", () => {
+    cancelEdit();
+    openView("add");
+    setTimeout(() => el.drinkSelect?.focus(), 80);
+  });
+
+  window.addEventListener("resize", () => {
+    if ($("view-dashboard").classList.contains("active")) {
+      renderDashboard();
+    }
+  });
 }
 
 
 /* ============================================================
-   8. RENDER ALL
+   9. RENDER ALL
    ============================================================ */
 
 function renderAll() {
@@ -488,20 +598,25 @@ function renderAll() {
 
 
 /* ============================================================
-   9. GETRÄNKE
+   10. GETRÄNKE
    ============================================================ */
 
 function renderDrinkSelect() {
+  const current = el.drinkSelect.value;
+
   el.drinkSelect.innerHTML = "";
 
   state.drinks.forEach((drink) => {
     const option = document.createElement("option");
     option.value = drink.name;
-    option.textContent = `${drink.emoji || "☕"} ${drink.name}`;
+    option.textContent = `${getMethodIcon(drink.drink_type || drink.name)} ${drink.name}`;
     el.drinkSelect.appendChild(option);
   });
 
-  if (state.drinks.length) {
+  if (current && state.drinks.some((drink) => drink.name === current)) {
+    el.drinkSelect.value = current;
+  } else if (state.drinks.length) {
+    el.drinkSelect.value = state.drinks[0].name;
     fillFormFromDrink(state.drinks[0]);
   }
 }
@@ -514,7 +629,7 @@ function renderQuickFavorites() {
     button.type = "button";
     button.className = "quick-btn";
     button.innerHTML = `
-      <span>${escapeHTML(drink.emoji || "☕")}</span>
+      <span>${escapeHTML(getMethodIcon(drink.drink_type || drink.name))}</span>
       <strong>${escapeHTML(drink.name)}</strong>
       <small>${formatNumber(drink.default_caffeine_mg)} mg</small>
     `;
@@ -537,7 +652,7 @@ function fillFormFromDrink(drink) {
   if (!drink) return;
 
   el.customDrinkName.value = "";
-  el.drinkEmoji.value = drink.emoji || "☕";
+  el.drinkEmoji.value = getMethodIcon(drink.drink_type || drink.name);
   el.drinkType.value = drink.drink_type || "";
   el.amountMl.value = drink.default_amount_ml ?? "";
   el.caffeineMg.value = drink.default_caffeine_mg ?? "";
@@ -554,7 +669,7 @@ async function saveDrinkTemplate() {
   const payload = {
     name,
     drink_type: el.drinkType.value.trim() || null,
-    emoji: el.drinkEmoji.value.trim() || "☕",
+    emoji: el.drinkEmoji.value.trim() || getMethodIcon(el.drinkType.value),
     default_amount_ml: toNumber(el.amountMl.value) ?? 200,
     default_caffeine_mg: toNumber(el.caffeineMg.value) ?? 80,
   };
@@ -575,6 +690,7 @@ async function saveDrinkTemplate() {
 
   showToast("Getränkevorlage gespeichert ☕");
   setFormMessage("Getränkevorlage gespeichert.");
+
   await loadDrinks();
   renderDrinkSelect();
   renderQuickFavorites();
@@ -585,7 +701,7 @@ async function saveDrinkTemplate() {
 
 
 /* ============================================================
-   10. FORMULAR
+   11. FORMULAR
    ============================================================ */
 
 function readEntryForm() {
@@ -601,7 +717,7 @@ function readEntryForm() {
 
     drink_name: drinkName,
     drink_type: el.drinkType.value.trim() || selectedDrink?.drink_type || null,
-    emoji: el.drinkEmoji.value.trim() || selectedDrink?.emoji || "☕",
+    emoji: el.drinkEmoji.value.trim() || getMethodIcon(el.drinkType.value || drinkName),
 
     amount_ml: toNumber(el.amountMl.value),
     caffeine_mg: toNumber(el.caffeineMg.value),
@@ -686,6 +802,7 @@ async function saveEntry() {
   showToast(isEditing ? "Eintrag aktualisiert ☕" : "Kaffee hinzugefügt ☕");
 
   resetForm();
+
   await loadEntries();
   renderAll();
   openView("history");
@@ -735,7 +852,7 @@ function startEdit(entry) {
     el.customDrinkName.value = entry.drink_name || "";
   }
 
-  el.drinkEmoji.value = entry.emoji || "☕";
+  el.drinkEmoji.value = entry.emoji || getMethodIcon(entry);
   el.drinkType.value = entry.drink_type || "";
   el.amountMl.value = entry.amount_ml ?? "";
   el.caffeineMg.value = entry.caffeine_mg ?? "";
@@ -756,12 +873,11 @@ function startEdit(entry) {
 
 function cancelEdit() {
   resetForm();
-  showToast("Bearbeiten abgebrochen.");
 }
 
 
 /* ============================================================
-   11. EINTRÄGE / VERLAUF
+   12. EINTRÄGE / VERLAUF
    ============================================================ */
 
 function getFilteredEntries() {
@@ -796,13 +912,12 @@ function renderFilterDrinkSelect() {
 
 function renderEntries() {
   const entries = getFilteredEntries();
+
   el.entriesCount.textContent = `${entries.length} Einträge`;
   el.entriesList.innerHTML = "";
 
   if (!entries.length) {
-    el.entriesList.innerHTML = `
-      <div class="empty">Noch keine passenden Einträge vorhanden.</div>
-    `;
+    el.entriesList.innerHTML = `<div class="empty">Noch keine passenden Einträge vorhanden.</div>`;
     return;
   }
 
@@ -823,20 +938,25 @@ function renderEntries() {
     group.innerHTML = `
       <div class="day-head">
         <h3>${escapeHTML(formatDateHeader(day))}</h3>
-        <span>${formatNumber(dayTotal)} mg Koffein</span>
+        <span>${formatNumber(dayTotal)} mg</span>
       </div>
     `;
 
     dayEntries.forEach((entry) => {
       const card = document.createElement("article");
-      card.className = "entry-card";
+      card.className = `entry-card compact ${getRatingClass(entry.rating)}`;
       card.tabIndex = 0;
 
-      const ratingText = entry.rating ? `⭐ ${entry.rating}/5` : "⭐ –";
+      const methodIcon = entry.emoji || getMethodIcon(entry);
+      const ratingText = entry.rating ? `${entry.rating}/5` : "–";
+      const methodName = getMethodName(entry);
 
       card.innerHTML = `
+        <div class="swipe-hint left">Bearbeiten</div>
+        <div class="swipe-hint right">Löschen</div>
+
         <div class="entry-main">
-          <div class="entry-icon">${escapeHTML(entry.emoji || "☕")}</div>
+          <div class="entry-icon">${escapeHTML(methodIcon)}</div>
 
           <div class="entry-content">
             <div class="entry-title-row">
@@ -844,18 +964,18 @@ function renderEntries() {
               <span>${escapeHTML(formatEntryTime(entry.entry_time))}</span>
             </div>
 
-            <div class="entry-meta">
-              <span>${formatNumber(entry.amount_ml)} ml</span>
+            <div class="entry-meta compact-meta">
+              <span class="method-chip">${escapeHTML(methodIcon)} ${escapeHTML(methodName)}</span>
               <span>${formatNumber(entry.caffeine_mg)} mg</span>
-              <span>${escapeHTML(entry.drink_type || "Typ offen")}</span>
-              <span>${ratingText}</span>
+              <span>${formatNumber(entry.amount_ml)} ml</span>
+              <span class="rating-chip ${getRatingClass(entry.rating)}">★ ${ratingText}</span>
             </div>
 
             ${
               entry.mahlgrad || entry.extraction_time_s || entry.pressure_bar
                 ? `
                   <div class="entry-meta secondary-meta">
-                    <span>Mahlgrad ${formatNumber(entry.mahlgrad, 1)}</span>
+                    <span>MG ${formatNumber(entry.mahlgrad, 1)}</span>
                     <span>${formatNumber(entry.extraction_time_s, 1)} s</span>
                     <span>${formatNumber(entry.pressure_bar, 1)} Bar</span>
                   </div>
@@ -870,7 +990,10 @@ function renderEntries() {
         <button class="delete-entry" type="button" aria-label="Eintrag löschen">×</button>
       `;
 
-      card.addEventListener("click", () => startEdit(entry));
+      card.addEventListener("click", () => {
+        if (card.dataset.swiped === "true") return;
+        startEdit(entry);
+      });
 
       card.addEventListener("keydown", (event) => {
         if (event.key === "Enter") startEdit(entry);
@@ -881,10 +1004,67 @@ function renderEntries() {
         await deleteEntry(entry.id);
       });
 
+      enableSwipeActions(card, entry);
+
       group.appendChild(card);
     });
 
     el.entriesList.appendChild(group);
+  });
+}
+
+function enableSwipeActions(card, entry) {
+  let startX = 0;
+  let currentX = 0;
+  let dragging = false;
+
+  card.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "mouse") return;
+
+    startX = event.clientX;
+    currentX = startX;
+    dragging = true;
+    card.dataset.swiped = "false";
+    card.setPointerCapture(event.pointerId);
+  });
+
+  card.addEventListener("pointermove", (event) => {
+    if (!dragging) return;
+
+    currentX = event.clientX;
+    const dx = currentX - startX;
+
+    if (Math.abs(dx) > 8) {
+      card.style.transform = `translateX(${Math.max(Math.min(dx, 90), -90)}px)`;
+      card.classList.toggle("swiping-edit", dx > 30);
+      card.classList.toggle("swiping-delete", dx < -30);
+    }
+  });
+
+  card.addEventListener("pointerup", async () => {
+    if (!dragging) return;
+
+    dragging = false;
+    const dx = currentX - startX;
+
+    card.style.transform = "";
+    card.classList.remove("swiping-edit", "swiping-delete");
+
+    if (dx > 82) {
+      card.dataset.swiped = "true";
+      startEdit(entry);
+      return;
+    }
+
+    if (dx < -82) {
+      card.dataset.swiped = "true";
+      await deleteEntry(entry.id);
+      return;
+    }
+
+    setTimeout(() => {
+      card.dataset.swiped = "false";
+    }, 80);
   });
 }
 
@@ -937,7 +1117,7 @@ async function deleteAllEntries() {
 
 
 /* ============================================================
-   12. DASHBOARD / STATS
+   13. DASHBOARD / STATS
    ============================================================ */
 
 function renderDashboard() {
@@ -964,29 +1144,21 @@ function renderDashboard() {
     el.overLimitHint.classList.add("hidden");
   }
 
-  renderWeekChart();
-  renderMonthCalendar();
-  renderTopDrink();
-  renderHourPattern();
+  renderWeekCanvas();
+  renderTrendCanvas();
+  renderBeanRanking();
+  renderTopRatings();
+  renderMethodDistribution();
+  renderHeatmap();
 }
 
-function sumCaffeine(entries) {
-  return entries.reduce((sum, entry) => sum + (Number(entry.caffeine_mg) || 0), 0);
-}
-
-function sumCaffeineForDays(days) {
-  return days.reduce((sum, day) => {
-    const entries = state.entries.filter((entry) => entry.entry_date === day);
-    return sum + sumCaffeine(entries);
-  }, 0);
-}
-
-function renderWeekChart() {
+function renderWeekCanvas() {
   const days = getLastNDays(7);
-  const previousDays = getPreviousNDays(7, 7);
-  const limit = Number(state.settings.caffeine_limit_mg) || 400;
+  const values = days.map((day) => sumCaffeine(state.entries.filter((entry) => entry.entry_date === day)));
+  const average = values.reduce((a, b) => a + b, 0) / 7;
 
-  const currentTotal = sumCaffeineForDays(days);
+  const previousDays = getPreviousNDays(7, 7);
+  const currentTotal = values.reduce((a, b) => a + b, 0);
   const previousTotal = sumCaffeineForDays(previousDays);
 
   if (previousTotal > 0) {
@@ -997,124 +1169,202 @@ function renderWeekChart() {
     el.weekCompare.textContent = "Keine Vorwoche";
   }
 
-  el.weekChart.innerHTML = "";
+  const labels = days.map((day) =>
+    new Date(`${day}T00:00:00`).toLocaleDateString("de-DE", { weekday: "short" })
+  );
 
-  days.forEach((day) => {
-    const caffeine = sumCaffeine(state.entries.filter((entry) => entry.entry_date === day));
-    const percent = Math.min((caffeine / limit) * 100, 140);
+  drawBarWithAverage(el.weekCanvas, labels, values, average, "mg");
+}
+
+function renderTrendCanvas() {
+  const days = getLastNDays(30);
+  const values = days.map((day) => sumCaffeine(state.entries.filter((entry) => entry.entry_date === day)));
+
+  const firstHalf = values.slice(0, 15).reduce((a, b) => a + b, 0) / 15;
+  const secondHalf = values.slice(15).reduce((a, b) => a + b, 0) / 15;
+
+  let trend = "stabil";
+  if (secondHalf > firstHalf * 1.12) trend = "steigend";
+  if (secondHalf < firstHalf * 0.88) trend = "fallend";
+
+  el.trendBadge.textContent = trend;
+
+  const labels = days.map((day) => {
     const d = new Date(`${day}T00:00:00`);
-
-    const bar = document.createElement("div");
-    bar.className = "bar-row";
-    bar.innerHTML = `
-      <span>${d.toLocaleDateString("de-DE", { weekday: "short" })}</span>
-      <div class="bar-track">
-        <div class="bar-fill ${caffeine > limit ? "over" : ""}" style="width:${percent}%"></div>
-      </div>
-      <strong>${formatNumber(caffeine)} mg</strong>
-    `;
-
-    el.weekChart.appendChild(bar);
-  });
-}
-
-function renderMonthCalendar() {
-  el.monthCalendar.innerHTML = "";
-
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
-
-  const weekdayOffset = (firstDay.getDay() + 6) % 7;
-  const limit = Number(state.settings.caffeine_limit_mg) || 400;
-
-  ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"].forEach((label) => {
-    const head = document.createElement("div");
-    head.className = "calendar-head";
-    head.textContent = label;
-    el.monthCalendar.appendChild(head);
+    return d.getDate().toString();
   });
 
-  for (let i = 0; i < weekdayOffset; i++) {
-    const empty = document.createElement("div");
-    empty.className = "calendar-cell empty-cell";
-    el.monthCalendar.appendChild(empty);
-  }
-
-  for (let day = 1; day <= lastDay.getDate(); day++) {
-    const date = new Date(year, month, day);
-    const key = date.toISOString().slice(0, 10);
-    const caffeine = sumCaffeine(state.entries.filter((entry) => entry.entry_date === key));
-
-    const cell = document.createElement("div");
-    cell.className = "calendar-cell";
-    if (caffeine > limit) cell.classList.add("over");
-
-    cell.innerHTML = `
-      <strong>${day}</strong>
-      <span>${caffeine ? `${formatNumber(caffeine)} mg` : "–"}</span>
-    `;
-
-    el.monthCalendar.appendChild(cell);
-  }
+  drawLineChart(el.trendCanvas, labels, values, "mg");
 }
 
-function renderTopDrink() {
+function renderBeanRanking() {
+  el.beanRanking.innerHTML = "";
+
   if (!state.entries.length) {
-    el.topDrink.textContent = "Noch keine Daten";
+    el.beanRanking.innerHTML = `<div class="empty compact">Noch keine Daten.</div>`;
     return;
   }
 
-  const countMap = new Map();
+  const map = new Map();
 
   state.entries.forEach((entry) => {
-    countMap.set(entry.drink_name, (countMap.get(entry.drink_name) || 0) + 1);
+    const key = entry.drink_name || "Unbekannt";
+    map.set(key, (map.get(key) || 0) + 1);
   });
 
-  const top = Array.from(countMap.entries()).sort((a, b) => b[1] - a[1])[0];
+  const items = Array.from(map.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
 
-  el.topDrink.textContent = `${top[0]} (${top[1]}x)`;
+  const max = Math.max(...items.map((item) => item[1]));
+
+  items.forEach(([name, count], index) => {
+    const row = document.createElement("div");
+    row.className = "rank-row";
+    row.innerHTML = `
+      <span class="rank-number">${index + 1}</span>
+      <div>
+        <strong>${escapeHTML(name)}</strong>
+        <div class="mini-track">
+          <div class="mini-fill" style="width:${(count / max) * 100}%"></div>
+        </div>
+      </div>
+      <span>${count}x</span>
+    `;
+
+    el.beanRanking.appendChild(row);
+  });
 }
 
-function renderHourPattern() {
-  const hourMap = new Map();
+function renderTopRatings() {
+  el.topRatings.innerHTML = "";
+
+  const rated = state.entries
+    .filter((entry) => Number(entry.rating) > 0)
+    .sort((a, b) => Number(b.rating) - Number(a.rating))
+    .slice(0, 5);
+
+  if (!rated.length) {
+    el.topRatings.innerHTML = `<div class="empty compact">Noch keine Bewertungen vorhanden.</div>`;
+    return;
+  }
+
+  rated.forEach((entry, index) => {
+    const row = document.createElement("div");
+    row.className = "rank-row";
+    row.innerHTML = `
+      <span class="rank-number">${index + 1}</span>
+      <div>
+        <strong>${escapeHTML(entry.drink_name)}</strong>
+        <small>${escapeHTML(formatDateHeader(entry.entry_date))} · ${escapeHTML(formatEntryTime(entry.entry_time))}</small>
+      </div>
+      <span class="rating-chip ${getRatingClass(entry.rating)}">★ ${entry.rating}/5</span>
+    `;
+
+    el.topRatings.appendChild(row);
+  });
+}
+
+function renderMethodDistribution() {
+  const map = new Map();
 
   state.entries.forEach((entry) => {
+    const method = getMethodName(entry);
+    map.set(method, (map.get(method) || 0) + 1);
+  });
+
+  const items = Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+
+  drawDonut(el.methodCanvas, items);
+
+  el.methodBars.innerHTML = "";
+
+  if (!items.length) {
+    el.methodBars.innerHTML = `<div class="empty compact">Noch keine Methoden-Daten.</div>`;
+    return;
+  }
+
+  const max = Math.max(...items.map((item) => item[1]));
+
+  items.slice(0, 6).forEach(([method, count]) => {
+    const row = document.createElement("div");
+    row.className = "method-row";
+    row.innerHTML = `
+      <span>${escapeHTML(getMethodIcon(method))}</span>
+      <strong>${escapeHTML(method)}</strong>
+      <div class="mini-track">
+        <div class="mini-fill" style="width:${(count / max) * 100}%"></div>
+      </div>
+      <small>${count}x</small>
+    `;
+
+    el.methodBars.appendChild(row);
+  });
+}
+
+function renderHeatmap() {
+  el.heatmap.innerHTML = "";
+
+  const hours = [];
+  for (let h = 5; h <= 23; h++) hours.push(h);
+
+  const weekdays = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+  const matrix = new Map();
+
+  state.entries.forEach((entry) => {
+    const d = new Date(`${entry.entry_date}T00:00:00`);
+    const weekday = (d.getDay() + 6) % 7;
     const hour = Number(String(entry.entry_time || "00:00").slice(0, 2));
-    if (Number.isFinite(hour)) {
-      hourMap.set(hour, (hourMap.get(hour) || 0) + 1);
+
+    if (hour >= 5 && hour <= 23) {
+      const key = `${weekday}-${hour}`;
+      matrix.set(key, (matrix.get(key) || 0) + 1);
     }
   });
 
-  el.hourChart.innerHTML = "";
+  const max = Math.max(1, ...matrix.values());
 
-  if (!hourMap.size) {
+  const top = Array.from(matrix.entries()).sort((a, b) => b[1] - a[1])[0];
+
+  if (top) {
+    const [key] = top;
+    const [weekday, hour] = key.split("-").map(Number);
+    el.peakHour.textContent = `${weekdays[weekday]} ${String(hour).padStart(2, "0")}:00`;
+  } else {
     el.peakHour.textContent = "–";
-    el.hourChart.innerHTML = `<div class="empty compact">Noch keine Uhrzeit-Daten.</div>`;
-    return;
   }
 
-  const maxCount = Math.max(...hourMap.values());
-  const topHour = Array.from(hourMap.entries()).sort((a, b) => b[1] - a[1])[0];
+  const topLeft = document.createElement("div");
+  topLeft.className = "heatmap-label";
+  topLeft.textContent = "";
+  el.heatmap.appendChild(topLeft);
 
-  el.peakHour.textContent = `${String(topHour[0]).padStart(2, "0")}:00 Uhr`;
+  hours.forEach((hour) => {
+    const cell = document.createElement("div");
+    cell.className = "heatmap-label hour-label";
+    cell.textContent = String(hour);
+    el.heatmap.appendChild(cell);
+  });
 
-  for (let hour = 5; hour <= 23; hour++) {
-    const count = hourMap.get(hour) || 0;
-    const height = maxCount ? Math.max((count / maxCount) * 100, count ? 12 : 4) : 4;
+  weekdays.forEach((weekdayLabel, weekdayIndex) => {
+    const label = document.createElement("div");
+    label.className = "heatmap-label";
+    label.textContent = weekdayLabel;
+    el.heatmap.appendChild(label);
 
-    const item = document.createElement("div");
-    item.className = "hour-item";
-    item.innerHTML = `
-      <div class="hour-bar" style="height:${height}%"></div>
-      <span>${hour}</span>
-    `;
+    hours.forEach((hour) => {
+      const count = matrix.get(`${weekdayIndex}-${hour}`) || 0;
+      const intensity = count / max;
 
-    el.hourChart.appendChild(item);
-  }
+      const cell = document.createElement("div");
+      cell.className = "heatmap-cell";
+      cell.title = `${weekdayLabel} ${hour}:00 – ${count} Einträge`;
+      cell.style.opacity = count ? String(0.22 + intensity * 0.78) : "0.12";
+      cell.dataset.count = count;
+
+      el.heatmap.appendChild(cell);
+    });
+  });
 }
 
 function estimateRemainingCaffeine() {
@@ -1138,7 +1388,210 @@ function estimateRemainingCaffeine() {
 
 
 /* ============================================================
-   13. MAHLGRADE
+   14. CHARTS
+   ============================================================ */
+
+function setupCanvas(canvas) {
+  if (!canvas) return null;
+
+  const ctx = canvas.getContext("2d");
+  const ratio = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const width = rect.width || 400;
+  const height = Number(canvas.getAttribute("height")) || 260;
+
+  canvas.width = Math.floor(width * ratio);
+  canvas.height = Math.floor(height * ratio);
+
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+
+  return { ctx, width, height };
+}
+
+function drawBarWithAverage(canvas, labels, values, average, unit) {
+  const setup = setupCanvas(canvas);
+  if (!setup) return;
+
+  const { ctx, width, height } = setup;
+  const pad = 34;
+  const chartW = width - pad * 2;
+  const chartH = height - pad * 2;
+
+  const max = Math.max(average, ...values, 1) * 1.25;
+  const barGap = 10;
+  const barW = Math.max(12, (chartW - barGap * (values.length - 1)) / values.length);
+
+  ctx.strokeStyle = "rgba(245,245,245,0.14)";
+  ctx.lineWidth = 1;
+
+  for (let i = 0; i <= 4; i++) {
+    const y = pad + (chartH / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(pad, y);
+    ctx.lineTo(width - pad, y);
+    ctx.stroke();
+  }
+
+  values.forEach((value, index) => {
+    const x = pad + index * (barW + barGap);
+    const h = (value / max) * chartH;
+    const y = pad + chartH - h;
+
+    const grd = ctx.createLinearGradient(0, y, 0, y + h);
+    grd.addColorStop(0, "#ffcf8a");
+    grd.addColorStop(1, "#8b4513");
+
+    ctx.fillStyle = grd;
+    roundRect(ctx, x, y, barW, h || 2, 7);
+    ctx.fill();
+
+    ctx.fillStyle = "rgba(245,245,245,0.72)";
+    ctx.font = "12px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText(labels[index], x + barW / 2, height - 9);
+  });
+
+  const avgY = pad + chartH - (average / max) * chartH;
+
+  ctx.strokeStyle = "#f5f5f5";
+  ctx.setLineDash([6, 6]);
+  ctx.beginPath();
+  ctx.moveTo(pad, avgY);
+  ctx.lineTo(width - pad, avgY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = "#f5f5f5";
+  ctx.font = "12px system-ui";
+  ctx.textAlign = "left";
+  ctx.fillText(`Ø ${formatNumber(average)} ${unit}`, pad, avgY - 8);
+}
+
+function drawLineChart(canvas, labels, values, unit) {
+  const setup = setupCanvas(canvas);
+  if (!setup) return;
+
+  const { ctx, width, height } = setup;
+  const pad = 34;
+  const chartW = width - pad * 2;
+  const chartH = height - pad * 2;
+
+  if (!values.length || values.every((v) => !v)) {
+    ctx.fillStyle = "rgba(245,245,245,0.72)";
+    ctx.font = "14px system-ui";
+    ctx.fillText("Noch keine Daten", pad, height / 2);
+    return;
+  }
+
+  const max = Math.max(...values, 1) * 1.2;
+
+  ctx.strokeStyle = "rgba(245,245,245,0.14)";
+  ctx.lineWidth = 1;
+
+  for (let i = 0; i <= 4; i++) {
+    const y = pad + (chartH / 4) * i;
+    ctx.beginPath();
+    ctx.moveTo(pad, y);
+    ctx.lineTo(width - pad, y);
+    ctx.stroke();
+  }
+
+  const xFor = (i) => pad + (chartW * i) / Math.max(values.length - 1, 1);
+  const yFor = (v) => pad + chartH - (v / max) * chartH;
+
+  ctx.strokeStyle = "#ffcf8a";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+
+  values.forEach((value, index) => {
+    const x = xFor(index);
+    const y = yFor(value);
+
+    if (index === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+
+  ctx.stroke();
+
+  ctx.fillStyle = "#d4a574";
+  values.forEach((value, index) => {
+    if (value <= 0) return;
+
+    ctx.beginPath();
+    ctx.arc(xFor(index), yFor(value), 3.5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.fillStyle = "rgba(245,245,245,0.72)";
+  ctx.font = "12px system-ui";
+  ctx.textAlign = "left";
+  ctx.fillText(`${formatNumber(max)} ${unit}`, pad, 16);
+}
+
+function drawDonut(canvas, items) {
+  const setup = setupCanvas(canvas);
+  if (!setup) return;
+
+  const { ctx, width, height } = setup;
+
+  if (!items.length) {
+    ctx.fillStyle = "rgba(245,245,245,0.72)";
+    ctx.font = "14px system-ui";
+    ctx.fillText("Noch keine Daten", 24, height / 2);
+    return;
+  }
+
+  const total = items.reduce((sum, item) => sum + item[1], 0);
+  const cx = width / 2;
+  const cy = height / 2;
+  const radius = Math.min(width, height) * 0.32;
+  const lineWidth = 28;
+
+  const colors = ["#ffcf8a", "#d4a574", "#8b4513", "#b8753a", "#f0b36e", "#6a3514"];
+
+  let start = -Math.PI / 2;
+
+  items.forEach((item, index) => {
+    const value = item[1];
+    const angle = (value / total) * Math.PI * 2;
+
+    ctx.strokeStyle = colors[index % colors.length];
+    ctx.lineWidth = lineWidth;
+    ctx.lineCap = "round";
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, start, start + angle);
+    ctx.stroke();
+
+    start += angle;
+  });
+
+  ctx.fillStyle = "#f5f5f5";
+  ctx.font = "700 22px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText(String(total), cx, cy + 2);
+
+  ctx.fillStyle = "rgba(245,245,245,0.72)";
+  ctx.font = "12px system-ui";
+  ctx.fillText("Einträge", cx, cy + 22);
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  const radius = Math.min(r, w / 2, h / 2);
+
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.arcTo(x + w, y, x + w, y + h, radius);
+  ctx.arcTo(x + w, y + h, x, y + h, radius);
+  ctx.arcTo(x, y + h, x, y, radius);
+  ctx.arcTo(x, y, x + w, y, radius);
+  ctx.closePath();
+}
+
+
+/* ============================================================
+   15. MAHLGRADE
    ============================================================ */
 
 function grinderMatches(item) {
@@ -1176,11 +1629,12 @@ function renderGrinderSettings() {
 
   items.forEach((item) => {
     const row = document.createElement("tr");
+    const roastClass = getRoastClass(item.roestgrad);
 
     row.innerHTML = `
       <td><strong>${escapeHTML(item.marke || "–")}</strong></td>
       <td>${escapeHTML(item.bohne || "–")}</td>
-      <td>${escapeHTML(item.roestgrad || "–")}</td>
+      <td><span class="roast-chip ${roastClass}">${escapeHTML(item.roestgrad || "–")}</span></td>
       <td>${formatNumber(item.mahlgrad, 1)}</td>
       <td>${formatNumber(item.extraktionszeit_36g_s, 1)} s</td>
       <td>${formatNumber(item.druck_bar, 1)} Bar</td>
@@ -1199,7 +1653,7 @@ function renderGrinderSettings() {
 function applyGrinderSetting(item) {
   el.customDrinkName.value = item.bohne || "";
   el.drinkType.value = item.roestgrad || "Espresso";
-  el.drinkEmoji.value = "☕";
+  el.drinkEmoji.value = getMethodIcon("Espresso");
   el.amountMl.value = 36;
   el.caffeineMg.value = 80;
   el.mahlgrad.value = item.mahlgrad ?? "";
@@ -1213,7 +1667,7 @@ function applyGrinderSetting(item) {
 
 
 /* ============================================================
-   14. SETTINGS
+   16. SETTINGS
    ============================================================ */
 
 async function saveSettings() {
