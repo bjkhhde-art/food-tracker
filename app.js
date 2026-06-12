@@ -125,7 +125,6 @@ const targetWeightInput = $("targetWeightInput");
 const dailyCalorieGoalInput = $("dailyCalorieGoalInput");
 const saveProfileBtn = $("saveProfileBtn");
 
-const fabBtn = $("fabBtn");
 const openAddSheetBtn = $("openAddSheetBtn");
 const closeAddSheetBtn = $("closeAddSheetBtn");
 const addSheet = $("addSheet");
@@ -1676,7 +1675,6 @@ todayBtn.addEventListener("click", () => {
   loadDashboard();
 });
 
-fabBtn.addEventListener("click", openAddSheet);
 openAddSheetBtn.addEventListener("click", openAddSheet);
 navAddBtn.addEventListener("click", openAddSheet);
 closeAddSheetBtn.addEventListener("click", closeAddSheet);
