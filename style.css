@@ -443,6 +443,50 @@ button {
   grid-template-columns: 1fr;
 }
 
+.device-settings {
+  margin: 0 0 18px;
+  background: rgba(255,255,255,0.68);
+  border-radius: 20px;
+  padding: 14px;
+}
+
+.device-settings summary {
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.device-id-box {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.8);
+}
+
+.device-id-box span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  margin-bottom: 6px;
+}
+
+.device-id-box code {
+  display: block;
+  font-size: 12px;
+  line-height: 1.45;
+  word-break: break-all;
+  white-space: normal;
+  color: #111;
+}
+
+.device-settings p {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 700;
+}
+
 .chip-row {
   display: flex;
   flex-wrap: wrap;
