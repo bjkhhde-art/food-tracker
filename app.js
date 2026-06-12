@@ -11,7 +11,7 @@
 const SUPABASE_URL = "https://lrzgcqoqcwicpuuuhaoj.supabase.co";
 
 // Hier deinen kompletten Publishable Key eintragen.
-const SUPABASE_ANON_KEY = "DEIN_SUPABASE_PUBLISHABLE_KEY";
+const SUPABASE_ANON_KEY = "sb_publishable_uunR3UQ9rttiK8dG85IedQ__Tn1duVK";
 
 const TABLE_ENTRIES = "coffee_entries";
 const TABLE_DRINKS = "coffee_drinks";
