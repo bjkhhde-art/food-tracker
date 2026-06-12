@@ -325,12 +325,18 @@
       <div class="scanner-header">
         <div>
           <h2>Barcode scannen</h2>
-          <p>Halte den Barcode mittig vor die Kamera.</p>
+          <p>Halte den Barcode mittig vor die Kamera oder scanne ein Foto.</p>
         </div>
         <button id="closeScannerBtn" class="icon-btn">×</button>
       </div>
 
       <div id="scannerReader" class="scanner-reader"></div>
+
+      <div class="scanner-actions">
+        <button id="scanPhotoBtn" class="scanner-photo-btn">📸 Foto / Bild scannen</button>
+        <input id="barcodeImageInput" type="file" accept="image/*" capture="environment" hidden>
+      </div>
+
       <p id="scannerStatus" class="scanner-status">Scanner wird vorbereitet...</p>
     </div>
   </div>
