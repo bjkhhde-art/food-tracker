@@ -432,6 +432,22 @@ button {
   font-size: 17px;
 }
 
+.scanner-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.scanner-photo-btn {
+  width: 100%;
+  padding: 15px 18px;
+  border-radius: 18px;
+  color: #111;
+  background: linear-gradient(135deg, #ffd166, var(--yellow));
+  box-shadow: 0 12px 24px rgba(245,158,11,0.22);
+  font-size: 16px;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -507,24 +523,6 @@ button {
 
 .sheet-favorites {
   max-height: 220px;
-}
-
-.scrollable-favorites::-webkit-scrollbar {
-  width: 8px;
-}
-
-.scrollable-favorites::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.04);
-  border-radius: 999px;
-}
-
-.scrollable-favorites::-webkit-scrollbar-thumb {
-  background: rgba(34, 197, 94, 0.45);
-  border-radius: 999px;
-}
-
-.scrollable-favorites::-webkit-scrollbar-thumb:hover {
-  background: rgba(18, 148, 71, 0.7);
 }
 
 .food-chip,
@@ -852,7 +850,8 @@ button {
   min-height: 280px;
 }
 
-.scanner-reader video {
+.scanner-reader video,
+.scanner-reader img {
   border-radius: 22px;
 }
 
