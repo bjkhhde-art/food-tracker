@@ -874,7 +874,7 @@ async function deleteFavorite(foodId) {
 }
 
 /* -------------------------------------------------------
-   Barcode Scanner — Hybrid: native BarcodeDetector + html5-qrcode Fallback
+   Barcode Scanner — Native BarcodeDetector + html5-qrcode Fallback
 ------------------------------------------------------- */
 
 let nativeDetector = null;
@@ -882,6 +882,8 @@ let nativeStream = null;
 let nativeScanLoop = null;
 let currentFacingMode = 'environment';
 let useNativeScanner = false;
+let currentZoom = 1;
+let torchActive = false;
 
 async function initScanner() {
   if ('BarcodeDetector' in window) {
@@ -891,13 +893,34 @@ async function initScanner() {
       });
       useNativeScanner = true;
       console.log('✅ Native BarcodeDetector aktiv');
-    } catch (e) {
-      useNativeScanner = false;
-    }
+    } catch (e) { useNativeScanner = false; }
   } else {
     useNativeScanner = false;
-    console.log('⚠️ BarcodeDetector nicht verfügbar – html5-qrcode Fallback');
+    console.log('⚠️ Fallback: html5-qrcode');
   }
+}
+
+/* --- Blur-Detection: Frame nur auswerten wenn scharf genug --- */
+function isFrameSharp(video, threshold = 80) {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64; canvas.height = 64; // kleiner Sample-Bereich
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, 64, 64);
+    const data = ctx.getImageData(0, 0, 64, 64).data;
+    let variance = 0;
+    let mean = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      mean += (data[i] + data[i+1] + data[i+2]) / 3;
+    }
+    mean /= (data.length / 4);
+    for (let i = 0; i < data.length; i += 4) {
+      const lum = (data[i] + data[i+1] + data[i+2]) / 3;
+      variance += (lum - mean) ** 2;
+    }
+    variance /= (data.length / 4);
+    return Math.sqrt(variance) > threshold;
+  } catch (e) { return true; }
 }
 
 /* --- Native BarcodeDetector --- */
@@ -913,25 +936,58 @@ async function startNativeScanner() {
   scannerReader.appendChild(video);
 
   nativeStream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
+    video: {
+      facingMode: currentFacingMode,
+      width: { ideal: 1920 },
+      height: { ideal: 1080 }
+    }
   });
 
   video.srcObject = nativeStream;
   await video.play();
+
+  // Kamera-Capabilities auslesen und optimale Einstellungen setzen
+  const track = nativeStream.getVideoTracks()[0];
+  const capabilities = track.getCapabilities?.() || {};
+  const advanced = [];
+
+  // Kontinuierlicher Autofokus
+  if (capabilities.focusMode?.includes('continuous')) {
+    advanced.push({ focusMode: 'continuous' });
+  }
+
+  // Zoom: bei Hauptkamera 2× als Standard
+  if (capabilities.zoom && currentFacingMode === 'environment') {
+    const maxZoom = capabilities.zoom.max || 1;
+    const targetZoom = Math.min(currentZoom === 1 ? 2 : currentZoom, maxZoom);
+    currentZoom = targetZoom;
+    advanced.push({ zoom: targetZoom });
+    updateZoomButtons(targetZoom);
+  }
+
+  if (advanced.length > 0) {
+    try { await track.applyConstraints({ advanced }); } catch (e) {}
+  }
+
   isScannerRunning = true;
-  scannerStatus.textContent = 'Scanner läuft – Barcode einfach hinhalten 📦';
+  torchActive = false;
+  updateTorchButton();
+  scannerStatus.textContent = '📦 Scanner läuft – Barcode einfach hinhalten';
 
   const detectLoop = async () => {
     if (!isScannerRunning || !nativeDetector) return;
     try {
       if (video.readyState >= video.HAVE_ENOUGH_DATA) {
-        const barcodes = await nativeDetector.detect(video);
-        if (barcodes.length > 0 && barcodes[0].rawValue) {
-          await onScanSuccess(barcodes[0].rawValue);
-          return; // Loop stoppen nach Erfolg
+        // Blur-Check: nur scharfe Frames auswerten
+        if (isFrameSharp(video)) {
+          const barcodes = await nativeDetector.detect(video);
+          if (barcodes.length > 0 && barcodes[0].rawValue) {
+            await onScanSuccess(barcodes[0].rawValue);
+            return;
+          }
         }
       }
-    } catch (e) { /* Frame-Fehler ignorieren */ }
+    } catch (e) {}
     nativeScanLoop = requestAnimationFrame(detectLoop);
   };
 
@@ -941,9 +997,70 @@ async function startNativeScanner() {
 async function stopNativeScanner() {
   isScannerRunning = false;
   if (nativeScanLoop) { cancelAnimationFrame(nativeScanLoop); nativeScanLoop = null; }
-  if (nativeStream) { nativeStream.getTracks().forEach(t => t.stop()); nativeStream = null; }
+  if (nativeStream) {
+    // Torch ausschalten vor Stop
+    try {
+      const track = nativeStream.getVideoTracks()[0];
+      await track.applyConstraints({ advanced: [{ torch: false }] });
+    } catch (e) {}
+    nativeStream.getTracks().forEach(t => t.stop());
+    nativeStream = null;
+  }
+  torchActive = false;
+  updateTorchButton();
   const scannerReader = $('scannerReader');
   if (scannerReader) scannerReader.innerHTML = '';
+}
+
+/* --- Torch --- */
+
+async function toggleTorch() {
+  if (!nativeStream) return;
+  try {
+    const track = nativeStream.getVideoTracks()[0];
+    const capabilities = track.getCapabilities?.() || {};
+    if (!capabilities.torch) {
+      scannerStatus.textContent = 'Taschenlampe nicht verfügbar.';
+      return;
+    }
+    torchActive = !torchActive;
+    await track.applyConstraints({ advanced: [{ torch: torchActive }] });
+    updateTorchButton();
+    scannerStatus.textContent = torchActive ? '🔦 Licht an' : '🔦 Licht aus';
+    setTimeout(() => {
+      if (isScannerRunning) scannerStatus.textContent = '📦 Scanner läuft – Barcode einfach hinhalten';
+    }, 1200);
+  } catch (e) {
+    scannerStatus.textContent = 'Taschenlampe nicht verfügbar.';
+  }
+}
+
+function updateTorchButton() {
+  const btn = $('torchBtn');
+  if (!btn) return;
+  btn.classList.toggle('active', torchActive);
+  btn.textContent = torchActive ? '🔦 Licht an' : '🔦 Licht';
+}
+
+/* --- Zoom --- */
+
+async function setZoom(zoom) {
+  currentZoom = zoom;
+  updateZoomButtons(zoom);
+  if (!nativeStream) return;
+  try {
+    const track = nativeStream.getVideoTracks()[0];
+    const capabilities = track.getCapabilities?.() || {};
+    if (!capabilities.zoom) return;
+    const capped = Math.min(zoom, capabilities.zoom.max || zoom);
+    await track.applyConstraints({ advanced: [{ zoom: capped }] });
+  } catch (e) {}
+}
+
+function updateZoomButtons(zoom) {
+  document.querySelectorAll('.zoom-btn').forEach(btn => {
+    btn.classList.toggle('active', Number(btn.dataset.zoom) === Math.round(zoom));
+  });
 }
 
 /* --- html5-qrcode Fallback --- */
@@ -998,7 +1115,7 @@ async function stopFallbackScanner() {
 async function openScanner() {
   scannerOverlay.classList.remove('hidden');
   scannerStatus.textContent = 'Kamera wird gestartet...';
-  // Fokus-Button nur beim Fallback sinnvoll
+  currentZoom = currentFacingMode === 'environment' ? 2 : 1;
   const focusCamBtn = $('focusCamBtn');
   if (focusCamBtn) focusCamBtn.style.display = useNativeScanner ? 'none' : 'block';
   await startBarcodeScanner();
@@ -1006,16 +1123,11 @@ async function openScanner() {
 
 async function startBarcodeScanner() {
   try {
-    if (useNativeScanner) {
-      await startNativeScanner();
-    } else {
-      await startFallbackScanner();
-    }
+    if (useNativeScanner) await startNativeScanner();
+    else await startFallbackScanner();
   } catch (error) {
     console.error('Scanner Fehler:', error);
-    // Native schlägt fehl → automatisch Fallback versuchen
     if (useNativeScanner) {
-      console.log('Native fehlgeschlagen, versuche html5-qrcode...');
       useNativeScanner = false;
       try { await startFallbackScanner(); return; } catch (e) {}
     }
@@ -1024,11 +1136,8 @@ async function startBarcodeScanner() {
 }
 
 async function stopBarcodeScanner() {
-  if (useNativeScanner) {
-    await stopNativeScanner();
-  } else {
-    await stopFallbackScanner();
-  }
+  if (useNativeScanner || nativeStream) await stopNativeScanner();
+  else await stopFallbackScanner();
 }
 
 async function closeScanner() {
@@ -1039,13 +1148,14 @@ async function closeScanner() {
 
 async function switchCamera() {
   currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+  currentZoom = currentFacingMode === 'environment' ? 2 : 1;
   scannerStatus.textContent = 'Kamera wird gewechselt...';
   await stopBarcodeScanner();
   await startBarcodeScanner();
 }
 
 async function triggerFocus() {
-  if (useNativeScanner) return; // Native braucht keinen manuellen Fokus
+  if (useNativeScanner) return;
   try {
     const video = document.querySelector('#scannerReader video');
     if (!video?.srcObject) return;
@@ -1053,7 +1163,7 @@ async function triggerFocus() {
     await track.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] });
     scannerStatus.textContent = 'Fokus gesetzt ✓';
     setTimeout(() => {
-      if (isScannerRunning) scannerStatus.textContent = 'Scanner läuft. Barcode bitte mittig ausrichten.';
+      if (isScannerRunning) scannerStatus.textContent = 'Scanner läuft.';
     }, 1500);
   } catch (e) {
     scannerStatus.textContent = 'Fokus nicht unterstützt.';
@@ -1090,8 +1200,6 @@ async function scanBarcodeFromImage(file) {
     scannerOverlay.classList.remove('hidden');
     scannerStatus.textContent = 'Bild wird analysiert...';
     await stopBarcodeScanner();
-
-    // Native BarcodeDetector für Foto (direkt, kein Resize nötig)
     if ('BarcodeDetector' in window && nativeDetector) {
       try {
         const bitmap = await createImageBitmap(file);
@@ -1101,25 +1209,16 @@ async function scanBarcodeFromImage(file) {
           await handleScannedCode(barcodes[0].rawValue);
           return;
         }
-      } catch (e) { /* Weiter zum Fallback */ }
+      } catch (e) {}
     }
-
-    // html5-qrcode Fallback mit Resize
-    if (!window.Html5Qrcode) {
-      scannerStatus.textContent = 'Scanner-Bibliothek nicht geladen.'; return;
-    }
+    if (!window.Html5Qrcode) { scannerStatus.textContent = 'Scanner-Bibliothek nicht geladen.'; return; }
     const resizedBlob = await resizeImageForScan(file, 1600);
     html5QrCode = createScannerInstance();
     const decodedText = await html5QrCode.scanFile(resizedBlob, true);
     const scannedValue = String(decodedText || '').trim();
-    if (!scannedValue) {
-      scannerStatus.textContent = 'Kein Code erkannt. Versuche es mit mehr Licht und Schärfe.';
-      return;
-    }
-    scannerStatus.textContent = `Erkannt: ${scannedValue}`;
+    if (!scannedValue) { scannerStatus.textContent = 'Kein Code erkannt. Versuche es mit mehr Licht.'; return; }
     await handleScannedCode(scannedValue);
   } catch (error) {
-    console.error('Foto-Scan Fehler:', error);
     scannerStatus.textContent = 'Kein Barcode erkannt. Versuche es gerader und heller.';
   } finally {
     barcodeImageInput.value = '';
@@ -1130,35 +1229,11 @@ async function scanBarcodeFromImage(file) {
 async function handleScannedCode(scannedValue) {
   await closeScanner();
   foodSearchInput.value = scannedValue;
-  if (isBarcode(scannedValue)) {
-    await searchFoodsFromInput(scannedValue);
-  } else {
+  if (isBarcode(scannedValue)) await searchFoodsFromInput(scannedValue);
+  else {
     openAddSheet();
     foodResults.innerHTML = `<p>Code erkannt, aber kein gültiger Barcode: ${escapeHtml(scannedValue)}</p>`;
   }
-}
-
-async function stopBarcodeScanner() {
-  try {
-    if (html5QrCode && isScannerRunning) {
-      await html5QrCode.stop();
-      isScannerRunning = false;
-    }
-    if (html5QrCode) {
-      await html5QrCode.clear();
-    }
-  } catch (error) {
-    console.warn("Scanner konnte nicht sauber gestoppt werden:", error);
-  } finally {
-    html5QrCode = null;   // ← Fix: immer nullen, auch bei Fehler
-    isScannerRunning = false;
-  }
-}
-
-async function closeScanner() {
-  await stopBarcodeScanner();
-  scannerOverlay.classList.add("hidden");
-  scannerStatus.textContent = "Scanner wird vorbereitet...";
 }
 
 function getSelectedDateString() {
@@ -1826,16 +1901,17 @@ sheetOverlay.addEventListener("click", () => {
 scanBarcodeBtn.addEventListener("click", openScanner);
 closeScannerBtn.addEventListener("click", closeScanner);
 
-const switchCameraBtn = $('switchCameraBtn');
-switchCameraBtn?.addEventListener('click', switchCamera);
-
-const focusCamBtn = $('focusCamBtn');
-focusCamBtn?.addEventListener('click', triggerFocus);
-
 scannerOverlay.addEventListener("click", event => {
   if (event.target === scannerOverlay) {
     closeScanner();
   }
+});
+
+$('torchBtn')?.addEventListener('click', toggleTorch);
+$('switchCameraBtn')?.addEventListener('click', switchCamera);
+$('focusCamBtn')?.addEventListener('click', triggerFocus);
+document.querySelectorAll('.zoom-btn').forEach(btn => {
+  btn.addEventListener('click', () => setZoom(Number(btn.dataset.zoom)));
 });
 
 scanPhotoBtn.addEventListener("click", async () => {
@@ -1851,7 +1927,7 @@ barcodeImageInput.addEventListener("change", async event => {
 
 async function initApp() {
   initDefaults();
-  await initScanner(); // ← neu: Scanner-Typ ermitteln
+  await initScanner();
   await resolveCurrentUserId();
   await loadProfile();
   await loadFavorites();
