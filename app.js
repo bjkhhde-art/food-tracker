@@ -1021,14 +1021,24 @@ async function stopNativeScanner() {
 /* --- Torch --- */
 
 async function toggleTorch() {
-  if (!nativeStream) {
-    scannerStatus.textContent = '⚠️ Scanner muss aktiv sein.';
+  torchActive = !torchActive;
+
+  // Track aus nativeStream oder html5-qrcode Video holen
+  let track = null;
+  if (nativeStream) {
+    track = nativeStream.getVideoTracks()[0];
+  } else {
+    const video = document.querySelector('#scannerReader video');
+    if (video?.srcObject) track = video.srcObject.getVideoTracks()[0];
+  }
+
+  if (!track) {
+    torchActive = !torchActive;
+    scannerStatus.textContent = '⚠️ Scanner muss zuerst gestartet sein.';
     return;
   }
-  torchActive = !torchActive;
-  const track = nativeStream.getVideoTracks()[0];
+
   try {
-    // Beide Formate probieren — Browser reagieren unterschiedlich
     try {
       await track.applyConstraints({ advanced: [{ torch: torchActive }] });
     } catch (e1) {
@@ -1040,11 +1050,13 @@ async function toggleTorch() {
       if (isScannerRunning) scannerStatus.textContent = '📦 Scanner läuft – Barcode einfach hinhalten';
     }, 1200);
   } catch (e) {
-    torchActive = !torchActive; // zurücksetzen
+    torchActive = !torchActive;
     updateTorchButton();
     scannerStatus.textContent = '🔦 Taschenlampe nicht unterstützt.';
   }
 }
+
+/* --- Zoom --- */
 
 /* --- Zoom --- */
 
@@ -1061,27 +1073,22 @@ async function setZoom(zoom) {
   currentZoom = zoom;
   updateZoomButtons(zoom);
 
-  if (!nativeStream) {
-    // Fallback für html5-qrcode: CSS-Zoom
-    applyCssZoom(zoom);
-    return;
-  }
+  // CSS-Zoom IMMER anwenden — sofortiges visuelles Feedback
+  applyCssZoom(zoom);
 
-  const track = nativeStream.getVideoTracks()[0];
-  const capabilities = track.getCapabilities?.() || {};
-
-  if (capabilities.zoom) {
-    try {
-      const capped = Math.min(zoom, capabilities.zoom.max || zoom);
-      await track.applyConstraints({ advanced: [{ zoom: capped }] });
-      return; // Hardware-Zoom hat funktioniert
-    } catch (e) {
-      console.warn('Hardware-Zoom fehlgeschlagen, nutze CSS-Zoom:', e);
+  // Zusätzlich Hardware-Zoom versuchen wenn Native-Stream aktiv
+  if (nativeStream) {
+    const track = nativeStream.getVideoTracks()[0];
+    const capabilities = track.getCapabilities?.() || {};
+    if (capabilities.zoom) {
+      try {
+        const capped = Math.min(zoom, capabilities.zoom.max || zoom);
+        await track.applyConstraints({ advanced: [{ zoom: capped }] });
+      } catch (e) {
+        // CSS-Zoom läuft bereits, kein Problem
+      }
     }
   }
-
-  // CSS-Fallback wenn Hardware-Zoom nicht verfügbar
-  applyCssZoom(zoom);
 }
 
 /* --- html5-qrcode Fallback --- */
