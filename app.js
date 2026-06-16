@@ -969,6 +969,12 @@ async function startNativeScanner() {
     try { await track.applyConstraints({ advanced }); } catch (e) {}
   }
 
+  updateZoomButtons(currentZoom);
+  if (!capabilities.zoom && currentZoom > 1) {
+    // Hardware-Zoom nicht verfügbar → CSS-Zoom nach kurzem Delay (Video muss erst laufen)
+    setTimeout(() => applyCssZoom(currentZoom), 300);
+  }
+  
   isScannerRunning = true;
   torchActive = false;
   updateTorchButton();
@@ -1015,52 +1021,67 @@ async function stopNativeScanner() {
 /* --- Torch --- */
 
 async function toggleTorch() {
-  if (!nativeStream) return;
+  if (!nativeStream) {
+    scannerStatus.textContent = '⚠️ Scanner muss aktiv sein.';
+    return;
+  }
+  torchActive = !torchActive;
+  const track = nativeStream.getVideoTracks()[0];
   try {
-    const track = nativeStream.getVideoTracks()[0];
-    const capabilities = track.getCapabilities?.() || {};
-    if (!capabilities.torch) {
-      scannerStatus.textContent = 'Taschenlampe nicht verfügbar.';
-      return;
+    // Beide Formate probieren — Browser reagieren unterschiedlich
+    try {
+      await track.applyConstraints({ advanced: [{ torch: torchActive }] });
+    } catch (e1) {
+      await track.applyConstraints({ torch: torchActive });
     }
-    torchActive = !torchActive;
-    await track.applyConstraints({ advanced: [{ torch: torchActive }] });
     updateTorchButton();
     scannerStatus.textContent = torchActive ? '🔦 Licht an' : '🔦 Licht aus';
     setTimeout(() => {
       if (isScannerRunning) scannerStatus.textContent = '📦 Scanner läuft – Barcode einfach hinhalten';
     }, 1200);
   } catch (e) {
-    scannerStatus.textContent = 'Taschenlampe nicht verfügbar.';
+    torchActive = !torchActive; // zurücksetzen
+    updateTorchButton();
+    scannerStatus.textContent = '🔦 Taschenlampe nicht unterstützt.';
   }
-}
-
-function updateTorchButton() {
-  const btn = $('torchBtn');
-  if (!btn) return;
-  btn.classList.toggle('active', torchActive);
-  btn.textContent = torchActive ? '🔦 Licht an' : '🔦 Licht';
 }
 
 /* --- Zoom --- */
 
+function applyCssZoom(zoom) {
+  const video = document.querySelector('#scannerReader video');
+  if (!video) return;
+  video.style.transform = zoom > 1 ? `scale(${zoom})` : '';
+  video.style.transformOrigin = 'center center';
+  const container = video.parentElement;
+  if (container) container.style.overflow = 'hidden';
+}
+
 async function setZoom(zoom) {
   currentZoom = zoom;
   updateZoomButtons(zoom);
-  if (!nativeStream) return;
-  try {
-    const track = nativeStream.getVideoTracks()[0];
-    const capabilities = track.getCapabilities?.() || {};
-    if (!capabilities.zoom) return;
-    const capped = Math.min(zoom, capabilities.zoom.max || zoom);
-    await track.applyConstraints({ advanced: [{ zoom: capped }] });
-  } catch (e) {}
-}
 
-function updateZoomButtons(zoom) {
-  document.querySelectorAll('.zoom-btn').forEach(btn => {
-    btn.classList.toggle('active', Number(btn.dataset.zoom) === Math.round(zoom));
-  });
+  if (!nativeStream) {
+    // Fallback für html5-qrcode: CSS-Zoom
+    applyCssZoom(zoom);
+    return;
+  }
+
+  const track = nativeStream.getVideoTracks()[0];
+  const capabilities = track.getCapabilities?.() || {};
+
+  if (capabilities.zoom) {
+    try {
+      const capped = Math.min(zoom, capabilities.zoom.max || zoom);
+      await track.applyConstraints({ advanced: [{ zoom: capped }] });
+      return; // Hardware-Zoom hat funktioniert
+    } catch (e) {
+      console.warn('Hardware-Zoom fehlgeschlagen, nutze CSS-Zoom:', e);
+    }
+  }
+
+  // CSS-Fallback wenn Hardware-Zoom nicht verfügbar
+  applyCssZoom(zoom);
 }
 
 /* --- html5-qrcode Fallback --- */
