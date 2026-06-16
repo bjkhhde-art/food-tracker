@@ -1006,10 +1006,6 @@ async function triggerFocus() {
   }
 }
 
-// Event-Listener — zusammen mit den anderen scanner listeners einfügen:
-const focusCamBtn = $("focusCamBtn");
-focusCamBtn.addEventListener("click", triggerFocus);
-
 async function handleScannedCode(scannedValue) {
   await closeScanner();
 
@@ -1710,6 +1706,10 @@ sheetOverlay.addEventListener("click", () => {
 
 scanBarcodeBtn.addEventListener("click", openScanner);
 closeScannerBtn.addEventListener("click", closeScanner);
+
+// Event-Listener — zusammen mit den anderen scanner listeners einfügen:
+const focusCamBtn = $("focusCamBtn");
+focusCamBtn?.addEventListener("click", triggerFocus);
 
 scannerOverlay.addEventListener("click", event => {
   if (event.target === scannerOverlay) {
