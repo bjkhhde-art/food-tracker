@@ -921,11 +921,7 @@ async function startBarcodeScanner() {
     }
 
     const scannerConfig = {
-      fps: 10,
-      qrbox: {
-        width: 280,
-        height: 170
-      },
+      fps: 15,
       aspectRatio: 1.777
     };
 
@@ -944,6 +940,23 @@ async function startBarcodeScanner() {
   }
 }
 
+async function resizeImageForScan(file, maxWidth = 1600) {
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, maxWidth / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.92);
+    };
+    img.src = url;
+  });
+}
+
 async function onScanSuccess(decodedText) {
   const scannedValue = String(decodedText || "").trim();
 
@@ -955,42 +968,47 @@ async function onScanSuccess(decodedText) {
 }
 
 async function scanBarcodeFromImage(file) {
-  if (!file) {
-    scannerStatus.textContent = "Kein Bild ausgewählt.";
-    return;
-  }
-
+  if (!file) { scannerStatus.textContent = "Kein Bild ausgewählt."; return; }
   try {
     scannerOverlay.classList.remove("hidden");
-    scannerStatus.textContent = "Foto wird ausgewertet...";
-
+    scannerStatus.textContent = "Bild wird optimiert...";
     await stopBarcodeScanner();
-
     if (!window.Html5Qrcode) {
-      scannerStatus.textContent = "Scanner-Bibliothek konnte nicht geladen werden.";
-      return;
+      scannerStatus.textContent = "Scanner-Bibliothek konnte nicht geladen werden."; return;
     }
-
+    const resizedBlob = await resizeImageForScan(file, 1600);  // ← Foto verkleinern
     html5QrCode = createScannerInstance();
-
-    const decodedText = await html5QrCode.scanFile(file, true);
+    const decodedText = await html5QrCode.scanFile(resizedBlob, true);
     const scannedValue = String(decodedText || "").trim();
-
-    if (!scannedValue) {
-      scannerStatus.textContent = "Auf dem Foto wurde kein Code erkannt.";
-      return;
-    }
-
+    if (!scannedValue) { scannerStatus.textContent = "Kein Code erkannt."; return; }
     scannerStatus.textContent = `Erkannt: ${scannedValue}`;
-
     await handleScannedCode(scannedValue);
   } catch (error) {
     console.error("Foto-Scan Fehler:", error);
-    scannerStatus.textContent = "Auf dem Foto wurde kein Barcode/QR-Code erkannt. Versuch es näher, heller und schärfer.";
+    scannerStatus.textContent = "Kein Barcode erkannt. Versuche es gerader und heller.";
   } finally {
     barcodeImageInput.value = "";
   }
 }
+
+async function triggerFocus() {
+  try {
+    const video = document.querySelector('#scannerReader video');
+    if (!video?.srcObject) return;
+    const track = video.srcObject.getVideoTracks()[0];
+    await track.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] });
+    scannerStatus.textContent = "Fokus gesetzt ✓";
+    setTimeout(() => {
+      if (isScannerRunning) scannerStatus.textContent = "Scanner läuft. Barcode bitte mittig ausrichten.";
+    }, 1500);
+  } catch (e) {
+    scannerStatus.textContent = "Fokus von diesem Gerät nicht unterstützt.";
+  }
+}
+
+// Event-Listener — zusammen mit den anderen scanner listeners einfügen:
+const focusCamBtn = $("focusCamBtn");
+focusCamBtn.addEventListener("click", triggerFocus);
 
 async function handleScannedCode(scannedValue) {
   await closeScanner();
@@ -1013,11 +1031,11 @@ async function stopBarcodeScanner() {
     }
     if (html5QrCode) {
       await html5QrCode.clear();
-      html5QrCode = null;  // ← DAS fehlt! Ohne diese Zeile schlägt jedes Re-Open fehl
     }
   } catch (error) {
     console.warn("Scanner konnte nicht sauber gestoppt werden:", error);
-    html5QrCode = null;  // ← auch im Fehlerfall nullen
+  } finally {
+    html5QrCode = null;   // ← Fix: immer nullen, auch bei Fehler
     isScannerRunning = false;
   }
 }
