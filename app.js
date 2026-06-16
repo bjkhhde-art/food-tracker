@@ -1011,12 +1011,14 @@ async function stopBarcodeScanner() {
       await html5QrCode.stop();
       isScannerRunning = false;
     }
-
     if (html5QrCode) {
       await html5QrCode.clear();
+      html5QrCode = null;  // ← DAS fehlt! Ohne diese Zeile schlägt jedes Re-Open fehl
     }
   } catch (error) {
     console.warn("Scanner konnte nicht sauber gestoppt werden:", error);
+    html5QrCode = null;  // ← auch im Fehlerfall nullen
+    isScannerRunning = false;
   }
 }
 
