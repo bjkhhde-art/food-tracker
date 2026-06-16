@@ -331,8 +331,16 @@
       <div id="scannerReader" class="scanner-reader"></div>
 
   <div class="scanner-actions">
-    <button id="switchCameraBtn" class="scanner-switch-btn">🔄 Kamera wechseln</button>
-    <button id="focusCamBtn" class="scanner-focus-btn">🎯 Fokussieren</button>
+    <div class="scanner-top-row">
+      <button id="switchCameraBtn" class="scanner-switch-btn">🔄 Kamera</button>
+      <button id="torchBtn" class="scanner-torch-btn">🔦 Licht</button>
+      <button id="focusCamBtn" class="scanner-focus-btn">🎯 Fokus</button>
+    </div>
+    <div class="scanner-zoom-row">
+      <button class="zoom-btn active" data-zoom="1">1×</button>
+      <button class="zoom-btn" data-zoom="2">2×</button>
+      <button class="zoom-btn" data-zoom="3">3×</button>
+    </div>
     <button id="scanPhotoBtn" class="scanner-photo-btn">📸 Foto / Bild scannen</button>
     <input id="barcodeImageInput" type="file" accept="image/*" capture="environment" hidden>
   </div>
