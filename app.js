@@ -1138,19 +1138,6 @@ async function handleScannedCode(scannedValue) {
   }
 }
 
-async function handleScannedCode(scannedValue) {
-  await closeScanner();
-
-  foodSearchInput.value = scannedValue;
-
-  if (isBarcode(scannedValue)) {
-    await searchFoodsFromInput(scannedValue);
-  } else {
-    openAddSheet();
-    foodResults.innerHTML = `<p>Code erkannt, aber kein gültiger Lebensmittel-Barcode: ${escapeHtml(scannedValue)}</p>`;
-  }
-}
-
 async function stopBarcodeScanner() {
   try {
     if (html5QrCode && isScannerRunning) {
@@ -1839,9 +1826,11 @@ sheetOverlay.addEventListener("click", () => {
 scanBarcodeBtn.addEventListener("click", openScanner);
 closeScannerBtn.addEventListener("click", closeScanner);
 
-// Event-Listener — zusammen mit den anderen scanner listeners einfügen:
-const focusCamBtn = $("focusCamBtn");
-focusCamBtn?.addEventListener("click", triggerFocus);
+const switchCameraBtn = $('switchCameraBtn');
+switchCameraBtn?.addEventListener('click', switchCamera);
+
+const focusCamBtn = $('focusCamBtn');
+focusCamBtn?.addEventListener('click', triggerFocus);
 
 scannerOverlay.addEventListener("click", event => {
   if (event.target === scannerOverlay) {
@@ -1862,9 +1851,8 @@ barcodeImageInput.addEventListener("change", async event => {
 
 async function initApp() {
   initDefaults();
-
+  await initScanner(); // ← neu: Scanner-Typ ermitteln
   await resolveCurrentUserId();
-
   await loadProfile();
   await loadFavorites();
   await loadDashboard();
