@@ -929,3 +929,12 @@ hr {
     min-height: 240px;
   }
 }
+.scanner-focus-btn {
+  width: 100%;
+  padding: 15px 18px;
+  border-radius: 18px;
+  color: white;
+  background: linear-gradient(135deg, #0ea5e9, #0369a1);
+  box-shadow: 0 12px 24px rgba(3,105,161,0.22);
+  font-size: 16px;
+}
