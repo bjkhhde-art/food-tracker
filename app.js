@@ -884,7 +884,7 @@ let currentFacingMode = 'environment';
 let useNativeScanner = false;
 let currentZoom = 2;
 let torchActive = false;
-let isDetecting = false; // Guard gegen parallele Detect-Aufrufe
+let isDetecting = false;
 
 async function initScanner() {
   if ('BarcodeDetector' in window) {
@@ -923,7 +923,6 @@ async function startNativeScanner() {
   video.srcObject = nativeStream;
   await video.play();
 
-  // Autofokus setzen
   const track = nativeStream.getVideoTracks()[0];
   try {
     const caps = track.getCapabilities?.() || {};
@@ -935,7 +934,6 @@ async function startNativeScanner() {
     if (Object.keys(adv).length > 0) await track.applyConstraints({ advanced: [adv] });
   } catch (e) {}
 
-  // CSS-Zoom immer anwenden (funktioniert auf jedem Gerät)
   updateZoomButtons(currentZoom);
   setTimeout(() => applyCssZoom(currentZoom), 300);
 
@@ -945,7 +943,6 @@ async function startNativeScanner() {
   updateTorchButton();
   scannerStatus.textContent = '📦 Scanner läuft – Barcode einfach hinhalten';
 
-  // Scan alle 200ms — kein requestAnimationFrame, kein isFrameSharp
   nativeScanLoop = setInterval(async () => {
     if (!isScannerRunning || !nativeDetector || isDetecting) return;
     if (video.readyState < video.HAVE_ENOUGH_DATA) return;
@@ -985,7 +982,6 @@ async function stopNativeScanner() {
 async function toggleTorch() {
   torchActive = !torchActive;
 
-  // Track aus nativeStream oder html5-qrcode Video holen
   let track = null;
   if (nativeStream) {
     track = nativeStream.getVideoTracks()[0];
@@ -1039,9 +1035,7 @@ function applyCssZoom(zoom) {
 async function setZoom(zoom) {
   currentZoom = zoom;
   updateZoomButtons(zoom);
-  // CSS-Zoom sofort anwenden — funktioniert immer
   applyCssZoom(zoom);
-  // Hardware-Zoom zusätzlich versuchen
   if (nativeStream) {
     const track = nativeStream.getVideoTracks()[0];
     try {
