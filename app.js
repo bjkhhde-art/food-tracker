@@ -882,8 +882,9 @@ let nativeStream = null;
 let nativeScanLoop = null;
 let currentFacingMode = 'environment';
 let useNativeScanner = false;
-let currentZoom = 1;
+let currentZoom = 2;
 let torchActive = false;
+let isDetecting = false; // Guard gegen parallele Detect-Aufrufe
 
 async function initScanner() {
   if ('BarcodeDetector' in window) {
@@ -893,34 +894,14 @@ async function initScanner() {
       });
       useNativeScanner = true;
       console.log('✅ Native BarcodeDetector aktiv');
-    } catch (e) { useNativeScanner = false; }
+    } catch (e) {
+      useNativeScanner = false;
+      console.warn('BarcodeDetector Init fehlgeschlagen:', e);
+    }
   } else {
     useNativeScanner = false;
     console.log('⚠️ Fallback: html5-qrcode');
   }
-}
-
-/* --- Blur-Detection: Frame nur auswerten wenn scharf genug --- */
-function isFrameSharp(video, threshold = 80) {
-  try {
-    const canvas = document.createElement('canvas');
-    canvas.width = 64; canvas.height = 64; // kleiner Sample-Bereich
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, 64, 64);
-    const data = ctx.getImageData(0, 0, 64, 64).data;
-    let variance = 0;
-    let mean = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      mean += (data[i] + data[i+1] + data[i+2]) / 3;
-    }
-    mean /= (data.length / 4);
-    for (let i = 0; i < data.length; i += 4) {
-      const lum = (data[i] + data[i+1] + data[i+2]) / 3;
-      variance += (lum - mean) ** 2;
-    }
-    variance /= (data.length / 4);
-    return Math.sqrt(variance) > threshold;
-  } catch (e) { return true; }
 }
 
 /* --- Native BarcodeDetector --- */
@@ -936,75 +917,56 @@ async function startNativeScanner() {
   scannerReader.appendChild(video);
 
   nativeStream = await navigator.mediaDevices.getUserMedia({
-    video: {
-      facingMode: currentFacingMode,
-      width: { ideal: 1920 },
-      height: { ideal: 1080 }
-    }
+    video: { facingMode: currentFacingMode, width: { ideal: 1920 }, height: { ideal: 1080 } }
   });
 
   video.srcObject = nativeStream;
   await video.play();
 
-  // Kamera-Capabilities auslesen und optimale Einstellungen setzen
+  // Autofokus setzen
   const track = nativeStream.getVideoTracks()[0];
-  const capabilities = track.getCapabilities?.() || {};
-  const advanced = [];
+  try {
+    const caps = track.getCapabilities?.() || {};
+    const adv = {};
+    if (caps.focusMode?.includes('continuous')) adv.focusMode = 'continuous';
+    if (caps.zoom && currentFacingMode === 'environment') {
+      adv.zoom = Math.min(currentZoom, caps.zoom.max || currentZoom);
+    }
+    if (Object.keys(adv).length > 0) await track.applyConstraints({ advanced: [adv] });
+  } catch (e) {}
 
-  // Kontinuierlicher Autofokus
-  if (capabilities.focusMode?.includes('continuous')) {
-    advanced.push({ focusMode: 'continuous' });
-  }
-
-  // Zoom: bei Hauptkamera 2× als Standard
-  if (capabilities.zoom && currentFacingMode === 'environment') {
-    const maxZoom = capabilities.zoom.max || 1;
-    const targetZoom = Math.min(currentZoom === 1 ? 2 : currentZoom, maxZoom);
-    currentZoom = targetZoom;
-    advanced.push({ zoom: targetZoom });
-    updateZoomButtons(targetZoom);
-  }
-
-  if (advanced.length > 0) {
-    try { await track.applyConstraints({ advanced }); } catch (e) {}
-  }
-
+  // CSS-Zoom immer anwenden (funktioniert auf jedem Gerät)
   updateZoomButtons(currentZoom);
-  if (!capabilities.zoom && currentZoom > 1) {
-    // Hardware-Zoom nicht verfügbar → CSS-Zoom nach kurzem Delay (Video muss erst laufen)
-    setTimeout(() => applyCssZoom(currentZoom), 300);
-  }
-  
+  setTimeout(() => applyCssZoom(currentZoom), 300);
+
   isScannerRunning = true;
+  isDetecting = false;
   torchActive = false;
   updateTorchButton();
   scannerStatus.textContent = '📦 Scanner läuft – Barcode einfach hinhalten';
 
-  const detectLoop = async () => {
-    if (!isScannerRunning || !nativeDetector) return;
+  // Scan alle 200ms — kein requestAnimationFrame, kein isFrameSharp
+  nativeScanLoop = setInterval(async () => {
+    if (!isScannerRunning || !nativeDetector || isDetecting) return;
+    if (video.readyState < video.HAVE_ENOUGH_DATA) return;
+    isDetecting = true;
     try {
-      if (video.readyState >= video.HAVE_ENOUGH_DATA) {
-        // Blur-Check: nur scharfe Frames auswerten
-        if (isFrameSharp(video)) {
-          const barcodes = await nativeDetector.detect(video);
-          if (barcodes.length > 0 && barcodes[0].rawValue) {
-            await onScanSuccess(barcodes[0].rawValue);
-            return;
-          }
-        }
+      const barcodes = await nativeDetector.detect(video);
+      if (barcodes.length > 0 && barcodes[0].rawValue) {
+        clearInterval(nativeScanLoop);
+        nativeScanLoop = null;
+        await onScanSuccess(barcodes[0].rawValue);
       }
     } catch (e) {}
-    nativeScanLoop = requestAnimationFrame(detectLoop);
-  };
-
-  nativeScanLoop = requestAnimationFrame(detectLoop);
+    isDetecting = false;
+  }, 200);
 }
 
 async function stopNativeScanner() {
   isScannerRunning = false;
-  if (nativeScanLoop) { cancelAnimationFrame(nativeScanLoop); nativeScanLoop = null; }
+  isDetecting = false;
+  if (nativeScanLoop) { clearInterval(nativeScanLoop); nativeScanLoop = null; }
   if (nativeStream) {
-    // Torch ausschalten vor Stop
     try {
       const track = nativeStream.getVideoTracks()[0];
       await track.applyConstraints({ advanced: [{ torch: false }] });
@@ -1046,17 +1008,22 @@ async function toggleTorch() {
     }
     updateTorchButton();
     scannerStatus.textContent = torchActive ? '🔦 Licht an' : '🔦 Licht aus';
-    setTimeout(() => {
-      if (isScannerRunning) scannerStatus.textContent = '📦 Scanner läuft – Barcode einfach hinhalten';
-    }, 1200);
   } catch (e) {
     torchActive = !torchActive;
     updateTorchButton();
     scannerStatus.textContent = '🔦 Taschenlampe nicht unterstützt.';
   }
+  setTimeout(() => {
+    if (isScannerRunning) scannerStatus.textContent = '📦 Scanner läuft – Barcode einfach hinhalten';
+  }, 1500);
 }
 
-/* --- Zoom --- */
+function updateTorchButton() {
+  const btn = $('torchBtn');
+  if (!btn) return;
+  btn.classList.toggle('active', torchActive);
+  btn.textContent = torchActive ? '🔦 Licht an' : '🔦 Licht';
+}
 
 /* --- Zoom --- */
 
@@ -1065,30 +1032,32 @@ function applyCssZoom(zoom) {
   if (!video) return;
   video.style.transform = zoom > 1 ? `scale(${zoom})` : '';
   video.style.transformOrigin = 'center center';
-  const container = video.parentElement;
-  if (container) container.style.overflow = 'hidden';
+  const reader = $('scannerReader');
+  if (reader) reader.style.overflow = 'hidden';
 }
 
 async function setZoom(zoom) {
   currentZoom = zoom;
   updateZoomButtons(zoom);
-
-  // CSS-Zoom IMMER anwenden — sofortiges visuelles Feedback
+  // CSS-Zoom sofort anwenden — funktioniert immer
   applyCssZoom(zoom);
-
-  // Zusätzlich Hardware-Zoom versuchen wenn Native-Stream aktiv
+  // Hardware-Zoom zusätzlich versuchen
   if (nativeStream) {
     const track = nativeStream.getVideoTracks()[0];
-    const capabilities = track.getCapabilities?.() || {};
-    if (capabilities.zoom) {
-      try {
-        const capped = Math.min(zoom, capabilities.zoom.max || zoom);
+    try {
+      const caps = track.getCapabilities?.() || {};
+      if (caps.zoom) {
+        const capped = Math.min(zoom, caps.zoom.max || zoom);
         await track.applyConstraints({ advanced: [{ zoom: capped }] });
-      } catch (e) {
-        // CSS-Zoom läuft bereits, kein Problem
       }
-    }
+    } catch (e) {}
   }
+}
+
+function updateZoomButtons(zoom) {
+  document.querySelectorAll('.zoom-btn').forEach(btn => {
+    btn.classList.toggle('active', Number(btn.dataset.zoom) === Math.round(zoom));
+  });
 }
 
 /* --- html5-qrcode Fallback --- */
@@ -1118,11 +1087,12 @@ async function startFallbackScanner() {
   if (!html5QrCode) html5QrCode = createScannerInstance();
   await html5QrCode.start(
     { facingMode: currentFacingMode },
-    { fps: 15, aspectRatio: 1.777 },
+    { fps: 10, aspectRatio: 1.777 },
     onScanSuccess,
     () => {}
   );
   isScannerRunning = true;
+  setTimeout(() => applyCssZoom(currentZoom), 500);
   scannerStatus.textContent = 'Scanner läuft. Barcode bitte mittig ausrichten.';
 }
 
@@ -1143,7 +1113,7 @@ async function stopFallbackScanner() {
 async function openScanner() {
   scannerOverlay.classList.remove('hidden');
   scannerStatus.textContent = 'Kamera wird gestartet...';
-  currentZoom = currentFacingMode === 'environment' ? 2 : 1;
+  if (currentFacingMode === 'environment') currentZoom = 2;
   const focusCamBtn = $('focusCamBtn');
   if (focusCamBtn) focusCamBtn.style.display = useNativeScanner ? 'none' : 'block';
   await startBarcodeScanner();
@@ -1156,10 +1126,11 @@ async function startBarcodeScanner() {
   } catch (error) {
     console.error('Scanner Fehler:', error);
     if (useNativeScanner) {
+      console.log('Native fehlgeschlagen, versuche html5-qrcode...');
       useNativeScanner = false;
       try { await startFallbackScanner(); return; } catch (e) {}
     }
-    scannerStatus.textContent = 'Kamera konnte nicht gestartet werden. Nutze den Foto-Button.';
+    scannerStatus.textContent = 'Kamera konnte nicht gestartet werden.';
   }
 }
 
