@@ -905,7 +905,6 @@ async function initScanner() {
 }
 
 /* --- Native BarcodeDetector --- */
-
 async function startNativeScanner() {
   const scannerReader = $('scannerReader');
   scannerReader.innerHTML = '';
@@ -923,6 +922,7 @@ async function startNativeScanner() {
   video.srcObject = nativeStream;
   await video.play();
 
+  // Autofokus + Hardware-Zoom versuchen
   const track = nativeStream.getVideoTracks()[0];
   try {
     const caps = track.getCapabilities?.() || {};
@@ -934,6 +934,7 @@ async function startNativeScanner() {
     if (Object.keys(adv).length > 0) await track.applyConstraints({ advanced: [adv] });
   } catch (e) {}
 
+  // Visueller CSS-Zoom
   updateZoomButtons(currentZoom);
   setTimeout(() => applyCssZoom(currentZoom), 300);
 
@@ -943,12 +944,30 @@ async function startNativeScanner() {
   updateTorchButton();
   scannerStatus.textContent = '📦 Scanner läuft – Barcode einfach hinhalten';
 
+  // Canvas für echten Zoom bei der Erkennung
+  const detectCanvas = document.createElement('canvas');
+  detectCanvas.width = 640;
+  detectCanvas.height = 360;
+  const detectCtx = detectCanvas.getContext('2d', { willReadFrequently: true });
+
   nativeScanLoop = setInterval(async () => {
     if (!isScannerRunning || !nativeDetector || isDetecting) return;
     if (video.readyState < video.HAVE_ENOUGH_DATA) return;
     isDetecting = true;
     try {
-      const barcodes = await nativeDetector.detect(video);
+      const vw = video.videoWidth || 1280;
+      const vh = video.videoHeight || 720;
+
+      // Mittelteil ausschneiden = echter Zoom für BarcodeDetector
+      const zoom = Math.max(1, currentZoom);
+      const sw = vw / zoom;
+      const sh = vh / zoom;
+      const sx = (vw - sw) / 2;
+      const sy = (vh - sh) / 2;
+
+      detectCtx.drawImage(video, sx, sy, sw, sh, 0, 0, detectCanvas.width, detectCanvas.height);
+
+      const barcodes = await nativeDetector.detect(detectCanvas);
       if (barcodes.length > 0 && barcodes[0].rawValue) {
         clearInterval(nativeScanLoop);
         nativeScanLoop = null;
@@ -956,7 +975,7 @@ async function startNativeScanner() {
       }
     } catch (e) {}
     isDetecting = false;
-  }, 200);
+  }, 150);
 }
 
 async function stopNativeScanner() {
