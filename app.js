@@ -146,7 +146,6 @@ let profile = null;
 let favorites = [];
 let latestWeights = [];
 
-let html5QrCode = null;
 let isScannerRunning = false;
 
 function initDefaults() {
@@ -415,23 +414,32 @@ async function getOpenFoodProductByBarcode(barcode) {
 }
 
 async function searchOpenFoodProducts(query) {
-  const params = new URLSearchParams({
-    search_terms: query,
-    page_size: "20",
-    fields: "code,product_name,brands,quantity,image_url,nutriments"
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
 
-  const url = `${OPENFOOD_API_BASE}/api/v2/search?${params.toString()}`;  // ← geändert
-  const response = await fetch(url);
-  const data = await response.json();
+  try {
+    const params = new URLSearchParams({
+      search_terms: query,
+      page_size: "10",
+      fields: "code,product_name,brands,quantity,image_url,nutriments"
+    });
 
-  const products = (data.products || [])
-    .map(normalizeOpenFoodProduct)
-    .filter(product => product.product_name && product.calories > 0);
+    const url = `${OPENFOOD_API_BASE}/api/v2/search?${params.toString()}`;
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+    const data = await response.json();
 
-  await Promise.all(products.map(upsertOpenFoodCache));
+    const products = (data.products || [])
+      .map(normalizeOpenFoodProduct)
+      .filter(product => product.product_name && product.calories > 0);
 
-  return products;
+    await Promise.all(products.map(upsertOpenFoodCache));
+    return products;
+  } catch (error) {
+    clearTimeout(timeout);
+    if (error.name === 'AbortError') throw new Error('OpenFoodFacts Timeout nach 5s');
+    throw error;
+  }
 }
 
 function normalizeOpenFoodProduct(product) {
@@ -585,37 +593,47 @@ async function searchFoodsFromInput(value) {
     }
   }
 
-  const [blsResult, cacheResult, apiResult] = await Promise.allSettled([
+  // Schritt 1: BLS + Cache sofort anzeigen (schnell)
+  const [blsResult, cacheResult] = await Promise.allSettled([
     searchBlsFoods(query),
-    searchOpenFoodCache(query),
-    searchOpenFoodProducts(query)
+    searchOpenFoodCache(query)
   ]);
 
   const blsResults = blsResult.status === "fulfilled" ? blsResult.value : [];
   const cacheResults = cacheResult.status === "fulfilled" ? cacheResult.value : [];
-  const apiResults = apiResult.status === "fulfilled" ? apiResult.value : [];
+  const fastResults = deduplicateFoodResults([...blsResults, ...cacheResults]);
 
-if (apiResult.status === "rejected") {
-  console.warn("OpenFoodFacts nicht erreichbar:", apiResult.reason);
-  // Kurzen Hinweis unter den Ergebnissen zeigen
-  const hint = document.createElement('p');
-  hint.style.cssText = 'color:var(--muted);font-size:13px;margin-top:8px;';
-  hint.textContent = '⚠️ OpenFoodFacts gerade nicht erreichbar – BLS-Daten und Cache werden angezeigt.';
-  foodResults.appendChild(hint);
-}
-
-  const combinedResults = deduplicateFoodResults([
-    ...blsResults,
-    ...cacheResults,
-    ...apiResults
-  ]);
-
-  if (combinedResults.length === 0) {
-    foodResults.innerHTML = "<p>Keine Lebensmittel gefunden.</p>";
-    return;
+  if (fastResults.length > 0) {
+    renderFoodResults(fastResults);
+    const loader = document.createElement('p');
+    loader.id = 'openfood-loader';
+    loader.style.cssText = 'color:var(--muted,#999);font-size:13px;margin-top:8px;';
+    loader.textContent = '🌐 Suche noch bei OpenFoodFacts...';
+    foodResults.appendChild(loader);
+  } else {
+    foodResults.innerHTML = '<p>🌐 Suche bei OpenFoodFacts...</p>';
   }
 
-  renderFoodResults(combinedResults);
+  // Schritt 2: OpenFoodFacts im Hintergrund laden
+  try {
+    const apiResults = await searchOpenFoodProducts(query);
+    const loader = document.getElementById('openfood-loader');
+    if (loader) loader.remove();
+
+    if (apiResults.length > 0) {
+      const allResults = deduplicateFoodResults([...blsResults, ...cacheResults, ...apiResults]);
+      renderFoodResults(allResults);
+    } else if (fastResults.length === 0) {
+      foodResults.innerHTML = '<p>Keine Lebensmittel gefunden.</p>';
+    }
+  } catch (error) {
+    const loader = document.getElementById('openfood-loader');
+    if (loader) loader.remove();
+    console.warn('OpenFoodFacts nicht erreichbar:', error.message);
+    if (fastResults.length === 0) {
+      foodResults.innerHTML = '<p>Keine Lebensmittel gefunden.</p>';
+    }
+  }
 }
 
 function deduplicateFoodResults(foods) {
@@ -958,6 +976,7 @@ async function stopNativeScanner() {
   isScannerRunning = false;
   scannerLocked = true;
 
+  try { Quagga.offDetected(); } catch (e) {}
   try { Quagga.stop(); } catch (e) {}
 
   if (nativeStream) {
@@ -1402,7 +1421,7 @@ function renderLineChart(container, points, showAllLabels) {
   const chartH = height - top - bottom;
   const maxY = Math.max(...points.map(p => p.value), profile?.daily_calorie_goal || 0, 100);
 
-  const getX = i => left + (i / (points.length - 1)) * chartW;
+  const getX = i => points.length <= 1 ? left + chartW / 2 : left + (i / (points.length - 1)) * chartW;
   const getY = value => top + chartH - (value / maxY) * chartH;
 
   const linePoints = points.map((p, i) => ({
