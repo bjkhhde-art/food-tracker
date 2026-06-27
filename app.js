@@ -874,178 +874,94 @@ async function deleteFavorite(foodId) {
 }
 
 /* -------------------------------------------------------
-   Barcode Scanner — Native BarcodeDetector + html5-qrcode Fallback
+   Barcode Scanner — Quagga2
 ------------------------------------------------------- */
 
-let nativeDetector = null;
 let nativeStream = null;
-let nativeScanLoop = null;
 let currentFacingMode = 'environment';
-let useNativeScanner = false;
-let currentZoom = 1;
-let torchActive = false;
+let scannerLocked = false;
 
 async function initScanner() {
-  if ('BarcodeDetector' in window) {
-    try {
-      nativeDetector = new BarcodeDetector({
-        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'qr_code']
-      });
-      useNativeScanner = true;
-      console.log('✅ Native BarcodeDetector aktiv');
-    } catch (e) { useNativeScanner = false; }
-  } else {
-    useNativeScanner = false;
-    console.log('⚠️ Fallback: html5-qrcode');
-  }
+  console.log(typeof Quagga !== 'undefined' ? '✅ Quagga2 bereit' : '❌ Quagga2 nicht geladen');
 }
-
-/* --- Blur-Detection: Frame nur auswerten wenn scharf genug --- */
-function isFrameSharp(video, threshold = 80) {
-  try {
-    const canvas = document.createElement('canvas');
-    canvas.width = 64; canvas.height = 64; // kleiner Sample-Bereich
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, 64, 64);
-    const data = ctx.getImageData(0, 0, 64, 64).data;
-    let variance = 0;
-    let mean = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      mean += (data[i] + data[i+1] + data[i+2]) / 3;
-    }
-    mean /= (data.length / 4);
-    for (let i = 0; i < data.length; i += 4) {
-      const lum = (data[i] + data[i+1] + data[i+2]) / 3;
-      variance += (lum - mean) ** 2;
-    }
-    variance /= (data.length / 4);
-    return Math.sqrt(variance) > threshold;
-  } catch (e) { return true; }
-}
-
-/* --- Native BarcodeDetector --- */
 
 async function startNativeScanner() {
   const scannerReader = $('scannerReader');
   scannerReader.innerHTML = '';
+  scannerLocked = false;
 
-  const video = document.createElement('video');
-  video.setAttribute('playsinline', 'true');
-  video.setAttribute('autoplay', 'true');
-  video.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:22px;display:block;';
-  scannerReader.appendChild(video);
-
-  nativeStream = await navigator.mediaDevices.getUserMedia({
-    video: {
-      facingMode: currentFacingMode,
-      width: { ideal: 1920 },
-      height: { ideal: 1080 }
-    }
-  });
-
-  video.srcObject = nativeStream;
-  await video.play();
-
-  // Kamera-Capabilities auslesen und optimale Einstellungen setzen
-  const track = nativeStream.getVideoTracks()[0];
-  const capabilities = track.getCapabilities?.() || {};
-  const advanced = [];
-
-  // Kontinuierlicher Autofokus
-  if (capabilities.focusMode?.includes('continuous')) {
-    advanced.push({ focusMode: 'continuous' });
+  if (typeof Quagga === 'undefined') {
+    scannerStatus.textContent = 'Scanner-Bibliothek nicht geladen.';
+    throw new Error('Quagga nicht verfügbar');
   }
 
-  if (advanced.length > 0) {
-    try { await track.applyConstraints({ advanced }); } catch (e) {}
-  }
-
-  isScannerRunning = true;
-  torchActive = false;
-  scannerStatus.textContent = '📦 Scanner läuft – Barcode einfach hinhalten';
-
-  const detectLoop = async () => {
-    if (!isScannerRunning || !nativeDetector) return;
-    try {
-      if (video.readyState >= video.HAVE_ENOUGH_DATA) {
-        // Blur-Check: nur scharfe Frames auswerten
-        if (isFrameSharp(video)) {
-          const barcodes = await nativeDetector.detect(video);
-          if (barcodes.length > 0 && barcodes[0].rawValue) {
-            await onScanSuccess(barcodes[0].rawValue);
-            return;
-          }
+  return new Promise((resolve, reject) => {
+    Quagga.init({
+      inputStream: {
+        name: 'Live',
+        type: 'LiveStream',
+        target: scannerReader,
+        constraints: {
+          facingMode: currentFacingMode,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
         }
+      },
+      decoder: {
+        readers: [
+          'ean_reader',
+          'ean_8_reader',
+          'upc_reader',
+          'upc_e_reader',
+          'code_128_reader',
+          'code_39_reader'
+        ]
+      },
+      locate: true,
+      frequency: 10
+    }, async (err) => {
+      if (err) {
+        console.error('Quagga init Fehler:', err);
+        reject(err);
+        return;
       }
-    } catch (e) {}
-    nativeScanLoop = requestAnimationFrame(detectLoop);
-  };
 
-  nativeScanLoop = requestAnimationFrame(detectLoop);
+      Quagga.start();
+
+      // Stream für spätere Nutzung (z.B. torch)
+      await new Promise(r => setTimeout(r, 300));
+      const videoEl = scannerReader.querySelector('video');
+      nativeStream = videoEl?.srcObject || null;
+
+      isScannerRunning = true;
+      scannerStatus.textContent = '📦 Scanner läuft – Barcode einfach hinhalten';
+
+      Quagga.onDetected(async (data) => {
+        const code = data?.codeResult?.code;
+        if (code && !scannerLocked) {
+          scannerLocked = true;
+          await onScanSuccess(code);
+        }
+      });
+
+      resolve();
+    });
+  });
 }
 
 async function stopNativeScanner() {
   isScannerRunning = false;
-  if (nativeScanLoop) { cancelAnimationFrame(nativeScanLoop); nativeScanLoop = null; }
+  scannerLocked = true;
+
+  try { Quagga.stop(); } catch (e) {}
+
   if (nativeStream) {
-    // Torch ausschalten vor Stop
-    try {
-      const track = nativeStream.getVideoTracks()[0];
-      await track.applyConstraints({ advanced: [{ torch: false }] });
-    } catch (e) {}
     nativeStream.getTracks().forEach(t => t.stop());
     nativeStream = null;
   }
-  torchActive = false;
+
   const scannerReader = $('scannerReader');
   if (scannerReader) scannerReader.innerHTML = '';
-}
-
-/* --- html5-qrcode Fallback --- */
-
-function getScannerFormats() {
-  if (!window.Html5QrcodeSupportedFormats) return undefined;
-  return [
-    Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
-    Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E,
-    Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39,
-    Html5QrcodeSupportedFormats.QR_CODE
-  ];
-}
-
-function createScannerInstance() {
-  const config = {};
-  const formatsToSupport = getScannerFormats();
-  if (formatsToSupport) config.formatsToSupport = formatsToSupport;
-  return new Html5Qrcode('scannerReader', config);
-}
-
-async function startFallbackScanner() {
-  if (!window.Html5Qrcode) {
-    scannerStatus.textContent = 'Scanner-Bibliothek konnte nicht geladen werden.';
-    return;
-  }
-  if (!html5QrCode) html5QrCode = createScannerInstance();
-  await html5QrCode.start(
-    { facingMode: currentFacingMode },
-    { fps: 15, aspectRatio: 1.777 },
-    onScanSuccess,
-    () => {}
-  );
-  isScannerRunning = true;
-  scannerStatus.textContent = 'Scanner läuft. Barcode bitte mittig ausrichten.';
-}
-
-async function stopFallbackScanner() {
-  try {
-    if (html5QrCode && isScannerRunning) await html5QrCode.stop();
-    if (html5QrCode) await html5QrCode.clear();
-  } catch (e) {
-    console.warn('html5-qrcode stop Fehler:', e);
-  } finally {
-    html5QrCode = null;
-    isScannerRunning = false;
-  }
 }
 
 /* --- Unified API --- */
@@ -1058,21 +974,16 @@ async function openScanner() {
 
 async function startBarcodeScanner() {
   try {
-    if (useNativeScanner) await startNativeScanner();
-    else await startFallbackScanner();
+    await startNativeScanner();
   } catch (error) {
     console.error('Scanner Fehler:', error);
-    if (useNativeScanner) {
-      useNativeScanner = false;
-      try { await startFallbackScanner(); return; } catch (e) {}
-    }
-    scannerStatus.textContent = 'Kamera konnte nicht gestartet werden. Nutze den Foto-Button.';
+    isScannerRunning = false;
+    scannerStatus.textContent = `Fehler: ${error.message || 'Kamera konnte nicht gestartet werden.'}`;
   }
 }
 
 async function stopBarcodeScanner() {
-  if (useNativeScanner || nativeStream) await stopNativeScanner();
-  else await stopFallbackScanner();
+  await stopNativeScanner();
 }
 
 async function closeScanner() {
@@ -1083,26 +994,9 @@ async function closeScanner() {
 
 async function switchCamera() {
   currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
-  currentZoom = currentFacingMode === 'environment' ? 2 : 1;
   scannerStatus.textContent = 'Kamera wird gewechselt...';
   await stopBarcodeScanner();
   await startBarcodeScanner();
-}
-
-async function triggerFocus() {
-  if (useNativeScanner) return;
-  try {
-    const video = document.querySelector('#scannerReader video');
-    if (!video?.srcObject) return;
-    const track = video.srcObject.getVideoTracks()[0];
-    await track.applyConstraints({ advanced: [{ focusMode: 'single-shot' }] });
-    scannerStatus.textContent = 'Fokus gesetzt ✓';
-    setTimeout(() => {
-      if (isScannerRunning) scannerStatus.textContent = 'Scanner läuft.';
-    }, 1500);
-  } catch (e) {
-    scannerStatus.textContent = 'Fokus nicht unterstützt.';
-  }
 }
 
 async function onScanSuccess(decodedText) {
@@ -1112,52 +1006,59 @@ async function onScanSuccess(decodedText) {
   await handleScannedCode(scannedValue);
 }
 
-async function resizeImageForScan(file, maxWidth = 1600) {
-  return new Promise(resolve => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const scale = Math.min(1, maxWidth / img.width);
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.92);
-    };
-    img.src = url;
-  });
-}
-
 async function scanBarcodeFromImage(file) {
   if (!file) { scannerStatus.textContent = 'Kein Bild ausgewählt.'; return; }
+  let imageUrl = null;
   try {
     scannerOverlay.classList.remove('hidden');
     scannerStatus.textContent = 'Bild wird analysiert...';
     await stopBarcodeScanner();
-    if ('BarcodeDetector' in window && nativeDetector) {
+    imageUrl = URL.createObjectURL(file);
+
+    // Native BarcodeDetector (schnell, wenn verfügbar)
+    if ('BarcodeDetector' in window) {
       try {
+        const detector = new BarcodeDetector({
+          formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'qr_code']
+        });
         const bitmap = await createImageBitmap(file);
-        const barcodes = await nativeDetector.detect(bitmap);
+        const barcodes = await detector.detect(bitmap);
+        bitmap.close();
         if (barcodes.length > 0 && barcodes[0].rawValue) {
-          scannerStatus.textContent = `Erkannt: ${barcodes[0].rawValue}`;
           await handleScannedCode(barcodes[0].rawValue);
           return;
         }
       } catch (e) {}
     }
-    if (!window.Html5Qrcode) { scannerStatus.textContent = 'Scanner-Bibliothek nicht geladen.'; return; }
-    const resizedBlob = await resizeImageForScan(file, 1600);
-    html5QrCode = createScannerInstance();
-    const decodedText = await html5QrCode.scanFile(resizedBlob, true);
-    const scannedValue = String(decodedText || '').trim();
-    if (!scannedValue) { scannerStatus.textContent = 'Kein Code erkannt. Versuche es mit mehr Licht.'; return; }
-    await handleScannedCode(scannedValue);
+
+    // Quagga Fallback für Bilder
+    if (typeof Quagga !== 'undefined') {
+      await new Promise((resolve, reject) => {
+        Quagga.decodeSingle({
+          decoder: {
+            readers: ['ean_reader', 'ean_8_reader', 'upc_reader', 'code_128_reader']
+          },
+          locate: true,
+          src: imageUrl
+        }, async (result) => {
+          if (result?.codeResult?.code) {
+            await handleScannedCode(result.codeResult.code);
+            resolve();
+          } else {
+            scannerStatus.textContent = 'Kein Code erkannt. Versuche es mit mehr Licht.';
+            resolve();
+          }
+        });
+      });
+      return;
+    }
+
+    scannerStatus.textContent = 'Kein Barcode erkannt.';
   } catch (error) {
     scannerStatus.textContent = 'Kein Barcode erkannt. Versuche es gerader und heller.';
   } finally {
+    if (imageUrl) URL.revokeObjectURL(imageUrl);
     barcodeImageInput.value = '';
-    html5QrCode = null;
   }
 }
 
