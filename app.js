@@ -895,69 +895,71 @@ async function initScanner() {
 async function startNativeScanner() {
   const scannerReader = $('scannerReader');
   scannerReader.innerHTML = '';
-
-  if (typeof ZXing === 'undefined') {
-    scannerStatus.textContent = 'Scanner-Bibliothek nicht geladen.';
-    throw new Error('ZXing nicht verfügbar');
-  }
-
-  const hints = new Map();
-  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-    ZXing.BarcodeFormat.EAN_13,
-    ZXing.BarcodeFormat.EAN_8,
-    ZXing.BarcodeFormat.UPC_A,
-    ZXing.BarcodeFormat.UPC_E,
-    ZXing.BarcodeFormat.CODE_128,
-    ZXing.BarcodeFormat.CODE_39,
-    ZXing.BarcodeFormat.QR_CODE,
-  ]);
-  hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-
-  zxingReader = new ZXing.BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 100 });
   scannerLocked = false;
 
-  await zxingReader.decodeFromConstraints(
-    { video: { facingMode: currentFacingMode, width: { ideal: 1920 }, height: { ideal: 1080 } } },
-    scannerReader,
-    async (result, error) => {
-      if (result && !scannerLocked) {
-        scannerLocked = true;
-        await onScanSuccess(result.getText());
+  return new Promise((resolve, reject) => {
+    Quagga.init({
+      inputStream: {
+        name: 'Live',
+        type: 'LiveStream',
+        target: scannerReader,
+        constraints: {
+          facingMode: currentFacingMode,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      },
+      decoder: {
+        readers: ['ean_reader', 'ean_8_reader', 'upc_reader', 'upc_e_reader', 'code_128_reader', 'code_39_reader']
+      },
+      locate: true,
+      frequency: 10
+    }, async (err) => {
+      if (err) { reject(err); return; }
+
+      Quagga.start();
+
+      // Stream für Torch/Zoom
+      await new Promise(r => setTimeout(r, 300));
+      const videoEl = scannerReader.querySelector('video');
+      nativeStream = videoEl?.srcObject || null;
+
+      if (nativeStream) {
+        const track = nativeStream.getVideoTracks()[0];
+        try {
+          const caps = track.getCapabilities?.() || {};
+          if (caps.focusMode?.includes('continuous')) {
+            await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+          }
+        } catch (e) {}
       }
-    }
-  );
 
-  // Stream für Torch/Zoom holen
-  let attempts = 0;
-  while (!nativeStream && attempts < 20) {
-    await new Promise(r => setTimeout(r, 100));
-    const videoEl = scannerReader.querySelector('video');
-    if (videoEl?.srcObject) nativeStream = videoEl.srcObject;
-    attempts++;
-  }
+      updateZoomButtons(currentZoom);
+      setTimeout(() => applyCssZoom(currentZoom), 400);
 
-  if (nativeStream) {
-    const track = nativeStream.getVideoTracks()[0];
-    try {
-      const caps = track.getCapabilities?.() || {};
-      const adv = {};
-      if (caps.focusMode?.includes('continuous')) adv.focusMode = 'continuous';
-      if (Object.keys(adv).length > 0) await track.applyConstraints({ advanced: [adv] });
-    } catch (e) {}
-  }
+      isScannerRunning = true;
+      torchActive = false;
+      updateTorchButton();
+      scannerStatus.textContent = '📦 Scanner läuft – Barcode einfach hinhalten';
 
-  updateZoomButtons(currentZoom);
-  setTimeout(() => applyCssZoom(currentZoom), 400);
+      Quagga.onDetected(async (data) => {
+        const code = data?.codeResult?.code;
+        if (code && !scannerLocked) {
+          scannerLocked = true;
+          await onScanSuccess(code);
+        }
+      });
 
-  isScannerRunning = true;
-  torchActive = false;
-  updateTorchButton();
-  scannerStatus.textContent = '📦 Scanner läuft – Barcode einfach hinhalten';
+      resolve();
+    });
+  });
 }
 
 async function stopNativeScanner() {
   isScannerRunning = false;
   scannerLocked = true;
+
+  try { Quagga.stop(); } catch (e) {}
 
   if (zxingReader) {
     try { zxingReader.reset(); } catch (e) {}
