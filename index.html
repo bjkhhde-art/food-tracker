@@ -331,16 +331,6 @@
       <div id="scannerReader" class="scanner-reader"></div>
 
   <div class="scanner-actions">
-    <div class="scanner-top-row">
-      <button id="switchCameraBtn" class="scanner-switch-btn">🔄 Kamera</button>
-      <button id="torchBtn" class="scanner-torch-btn">🔦 Licht</button>
-      <button id="focusCamBtn" class="scanner-focus-btn">🎯 Fokus</button>
-    </div>
-    <div class="scanner-zoom-row">
-      <button class="zoom-btn active" data-zoom="1">1×</button>
-      <button class="zoom-btn" data-zoom="2">2×</button>
-      <button class="zoom-btn" data-zoom="3">3×</button>
-    </div>
     <button id="scanPhotoBtn" class="scanner-photo-btn">📸 Foto / Bild scannen</button>
     <input id="barcodeImageInput" type="file" accept="image/*" capture="environment" hidden>
   </div>
@@ -350,7 +340,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://unpkg.com/@ericblade/quagga2@1.7.3/dist/quagga.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
