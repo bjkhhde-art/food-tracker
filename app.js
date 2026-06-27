@@ -595,9 +595,14 @@ async function searchFoodsFromInput(value) {
   const cacheResults = cacheResult.status === "fulfilled" ? cacheResult.value : [];
   const apiResults = apiResult.status === "fulfilled" ? apiResult.value : [];
 
-  if (apiResult.status === "rejected") {
-    console.warn("OpenFoodFacts API-Suche blockiert/fehlgeschlagen:", apiResult.reason);
-  }
+if (apiResult.status === "rejected") {
+  console.warn("OpenFoodFacts nicht erreichbar:", apiResult.reason);
+  // Kurzen Hinweis unter den Ergebnissen zeigen
+  const hint = document.createElement('p');
+  hint.style.cssText = 'color:var(--muted);font-size:13px;margin-top:8px;';
+  hint.textContent = '⚠️ OpenFoodFacts gerade nicht erreichbar – BLS-Daten und Cache werden angezeigt.';
+  foodResults.appendChild(hint);
+}
 
   const combinedResults = deduplicateFoodResults([
     ...blsResults,
