@@ -421,7 +421,7 @@ async function searchOpenFoodProducts(query) {
     fields: "code,product_name,brands,quantity,image_url,nutriments"
   });
 
-  const url = `${OPENFOOD_API_BASE}/cgi/search.pl?${params.toString()}&json=1`;
+  const url = `${OPENFOOD_API_BASE}/api/v2/search?${params.toString()}`;  // ← geändert
   const response = await fetch(url);
   const data = await response.json();
 
